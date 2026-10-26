@@ -1,0 +1,281 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Workspace {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  projects  Project[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("workspaces")
+}
+
+model Project {
+  id               String            @id @default(uuid())
+  workspaceId      String            @map("workspace_id")
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name             String
+  baseUrl          String            @map("base_url")
+  githubTestRepo   String            @map("github_test_repo")
+  githubDefectRepo String            @map("github_defect_repo")
+  autoHealMode     String            @default("suggest") @map("auto_heal_mode") // off, suggest, auto-safe
+  defectSystem     String            @default("github_issues") @map("defect_system")
+  ciProvider       String            @default("github_actions") @map("ci_provider")
+  environments     Environment[]
+  crawlJobs        CrawlJob[]
+  pages            Page[]
+  scenarios        Scenario[]
+  testRuns         TestRun[]
+  healingProposals HealingProposal[]
+  defects          Defect[]
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  @@map("projects")
+}
+
+model Environment {
+  id          String      @id @default(uuid())
+  projectId   String      @map("project_id")
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  baseUrl     String      @map("base_url")
+  isDefault   Boolean     @default(false) @map("is_default")
+  credentials Credential?
+  crawlJobs   CrawlJob[]
+  testRuns    TestRun[]
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@map("environments")
+}
+
+model Credential {
+  id                 String      @id @default(uuid())
+  environmentId      String      @unique @map("environment_id")
+  environment        Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  usernameEncrypted  String?     @map("username_encrypted")
+  passwordEncrypted  String?     @map("password_encrypted")
+  loginUrl           String?     @map("login_url")
+  encryptionIv       String?     @map("encryption_iv")
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  @@map("credentials")
+}
+
+model CrawlJob {
+  id            String         @id @default(uuid())
+  projectId     String         @map("project_id")
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environmentId String?        @map("environment_id")
+  environment   Environment?   @relation(fields: [environmentId], references: [id])
+  status        String         @default("pending") // pending, in_progress, completed, failed
+  depth         Int            @default(2)
+  pagesFound    Int            @default(0) @map("pages_found")
+  pagesCrawled  Int            @default(0) @map("pages_crawled")
+  startedAt     DateTime?      @map("started_at")
+  completedAt   DateTime?      @map("completed_at")
+  errorLog      String?        @map("error_log")
+  pages         Page[]
+  snapshots     PageSnapshot[]
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@map("crawl_jobs")
+}
+
+model Page {
+  id                       String         @id @default(uuid())
+  projectId                String         @map("project_id")
+  project                  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  crawlJobId               String?        @map("crawl_job_id")
+  crawlJob                 CrawlJob?      @relation(fields: [crawlJobId], references: [id])
+  url                      String
+  route                    String
+  title                    String?
+  domFingerprint           String?        @map("dom_fingerprint")
+  accessibilityFingerprint String?        @map("accessibility_fingerprint")
+  contentHash              String?        @map("content_hash")
+  lastCrawledAt            DateTime?      @map("last_crawled_at")
+  elements                 PageElement[]
+  snapshots                PageSnapshot[]
+  scenarios                Scenario[]
+  createdAt                DateTime       @default(now()) @map("created_at")
+
+  @@map("pages")
+}
+
+model PageElement {
+  id                String            @id @default(uuid())
+  pageId            String            @map("page_id")
+  page              Page              @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  elementTag        String            @map("element_tag")
+  elementRole       String?           @map("element_role")
+  accessibleName    String?           @map("accessible_name")
+  testId            String?           @map("test_id")
+  textContent       String?           @map("text_content")
+  primaryLocator    String            @map("primary_locator")
+  fallbackLocators  Json              @default("[]") @map("fallback_locators")
+  domFingerprint    String            @map("dom_fingerprint")
+  domPath           String            @map("dom_path")
+  boundingBox       Json?             @map("bounding_box")
+  healingProposals  HealingProposal[]
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  @@map("page_elements")
+}
+
+model PageSnapshot {
+  id                     String    @id @default(uuid())
+  pageId                 String    @map("page_id")
+  page                   Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  crawlJobId             String    @map("crawl_job_id")
+  crawlJob               CrawlJob  @relation(fields: [crawlJobId], references: [id], onDelete: Cascade)
+  domJson                Json?     @map("dom_json")
+  accessibilityTreeJson  Json?     @map("accessibility_tree_json")
+  screenshotUrl          String?   @map("screenshot_url")
+  harUrl                 String?   @map("har_url")
+  consoleLogs            Json?     @map("console_logs")
+  routeGraph             Json?     @map("route_graph")
+  createdAt              DateTime  @default(now()) @map("created_at")
+
+  @@map("page_snapshots")
+}
+
+model Scenario {
+  id             String      @id @default(uuid())
+  projectId      String      @map("project_id")
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pageId         String?     @map("page_id")
+  page           Page?       @relation(fields: [pageId], references: [id])
+  title          String
+  type           String      @default("functional") // smoke, functional, form_validation, navigation, api, visual, accessibility
+  riskLevel      String      @default("medium") @map("risk_level") // low, medium, high
+  preconditions  Json?
+  steps          Json
+  assertions     Json
+  testData       Json?       @map("test_data")
+  status         String      @default("pending") // pending, approved, rejected
+  reviewedBy     String?     @map("reviewed_by")
+  reviewedAt     DateTime?   @map("reviewed_at")
+  testFiles      TestFile[]
+  testResults    TestResult[]
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  @@map("scenarios")
+}
+
+model TestFile {
+  id              String       @id @default(uuid())
+  scenarioId      String       @map("scenario_id")
+  scenario        Scenario     @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  filePath        String       @map("file_path")
+  fileContentHash String       @map("file_content_hash")
+  pageObjectPath  String?      @map("page_object_path")
+  githubCommitSha String?      @map("github_commit_sha")
+  testResults     TestResult[]
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@map("test_files")
+}
+
+model TestRun {
+  id                   String        @id @default(uuid())
+  projectId            String        @map("project_id")
+  project              Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environmentId        String?       @map("environment_id")
+  environment          Environment?  @relation(fields: [environmentId], references: [id])
+  triggerType          String        @default("manual") @map("trigger_type") // manual, schedule, webhook
+  status               String        @default("queued") // queued, in_progress, passed, failed, cancelled
+  githubWorkflowRunId  String?       @map("github_workflow_run_id")
+  total                Int           @default(0)
+  passed               Int           @default(0)
+  failed               Int           @default(0)
+  skipped              Int           @default(0)
+  flaky                Int           @default(0)
+  durationMs           Int?          @map("duration_ms")
+  reportUrl            String?       @map("report_url")
+  startedAt            DateTime?     @map("started_at")
+  completedAt          DateTime?     @map("completed_at")
+  results              TestResult[]
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  @@map("test_runs")
+}
+
+model TestResult {
+  id                String            @id @default(uuid())
+  testRunId         String            @map("test_run_id")
+  testRun           TestRun           @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  testFileId        String?           @map("test_file_id")
+  testFile          TestFile?         @relation(fields: [testFileId], references: [id])
+  scenarioId        String?           @map("scenario_id")
+  scenario          Scenario?         @relation(fields: [scenarioId], references: [id])
+  status            String            // passed, failed, skipped
+  durationMs        Int               @map("duration_ms")
+  errorMessage      String?           @map("error_message")
+  retryCount        Int               @default(0) @map("retry_count")
+  flakyScore        Float             @default(0) @map("flaky_score")
+  traceUrl          String?           @map("trace_url")
+  videoUrl          String?           @map("video_url")
+  screenshotUrls    Json?             @map("screenshot_urls")
+  harUrl            String?           @map("har_url")
+  consoleErrors     Json?             @map("console_errors")
+  healingProposals  HealingProposal[]
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  @@map("test_results")
+}
+
+model HealingProposal {
+  id               String       @id @default(uuid())
+  projectId        String       @map("project_id")
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  testResultId     String       @map("test_result_id")
+  testResult       TestResult   @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+  elementId        String?      @map("element_id")
+  element          PageElement? @relation(fields: [elementId], references: [id])
+  oldLocator       String       @map("old_locator")
+  candidateLocators Json        @map("candidate_locators")
+  selectedLocator  String?      @map("selected_locator")
+  confidenceScore  Float        @map("confidence_score")
+  scoringDetails   Json?        @map("scoring_details")
+  validationResult String?      @map("validation_result") // passed, failed
+  llmUsed          Boolean      @default(false) @map("llm_used")
+  prUrl            String?      @map("pr_url")
+  prStatus         String?      @map("pr_status") // open, merged, closed
+  healingAttempts  Int          @default(1) @map("healing_attempts")
+  status           String       @default("pending_review") @map("status") // pending_review, approved, rejected, auto_merged
+  reviewedBy       String?      @map("reviewed_by")
+  reviewedAt       DateTime?    @map("reviewed_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  @@map("healing_proposals")
+}
+
+model Defect {
+  id                   String    @id @default(uuid())
+  projectId            String    @map("project_id")
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  externalSystem       String    @default("github_issues") @map("external_system")
+  externalId           String    @map("external_id")
+  externalUrl          String?   @map("external_url")
+  title                String
+  description          String
+  severity             String    @default("medium") // critical, high, medium, low
+  status               String    @default("open") // open, in_progress, ready_for_qa, qa_passed, qa_failed, closed
+  failureRunId         String?   @map("failure_run_id")
+  verificationLabel    String?   @default("ready-for-qa") @map("verification_label")
+  verificationAttempts Int       @default(0) @map("verification_attempts")
+  createdByPlatform    Boolean   @default(true) @map("created_by_platform")
+  closedAt             DateTime? @map("closed_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  @@map("defects")
+}
