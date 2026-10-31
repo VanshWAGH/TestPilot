@@ -59,29 +59,43 @@ export const CreateEnvironmentSchema = z.object({
   baseUrl: z.string().url("Must be a valid target environment URL"),
   headers: z.record(z.string()).optional(),
   isDefault: z.boolean().default(false),
+  credentials: ProjectCredentialsSchema.optional(),
 });
-export type CreateEnvironmentInput = z.infer<typeof CreateEnvironmentSchema>;
+export type CreateEnvironmentInput = z.input<typeof CreateEnvironmentSchema>;
 
 export const UpdateEnvironmentSchema = CreateEnvironmentSchema.partial();
-export type UpdateEnvironmentInput = z.infer<typeof UpdateEnvironmentSchema>;
+export type UpdateEnvironmentInput = z.input<typeof UpdateEnvironmentSchema>;
+
+export const EnvironmentCredentialSummarySchema = z.object({
+  id: z.string().uuid().optional(),
+  hasUsername: z.boolean().default(false),
+  hasPassword: z.boolean().default(false),
+  loginUrl: z.string().nullable().optional(),
+});
+export type EnvironmentCredentialSummary = z.infer<typeof EnvironmentCredentialSummarySchema>;
 
 export const EnvironmentResponseSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   name: z.string(),
-  type: EnvironmentTypeSchema,
+  type: EnvironmentTypeSchema.default("staging"),
   baseUrl: z.string(),
   headers: z.record(z.string()).nullable().optional(),
   isDefault: z.boolean(),
+  hasCredentials: z.boolean().default(false),
+  credentials: EnvironmentCredentialSummarySchema.nullable().optional(),
   createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
 });
 export type EnvironmentResponse = z.infer<typeof EnvironmentResponseSchema>;
 
 // --- Credential Schemas ---
 export const SetCredentialSchema = z.object({
-  key: z.string().min(1, "Credential key is required"),
-  value: z.string().min(1, "Credential value is required"),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  loginUrl: z.string().url().optional(),
+  key: z.string().optional(),
+  value: z.string().optional(),
   description: z.string().optional(),
 });
 export type SetCredentialInput = z.infer<typeof SetCredentialSchema>;
@@ -89,10 +103,13 @@ export type SetCredentialInput = z.infer<typeof SetCredentialSchema>;
 export const CredentialResponseSchema = z.object({
   id: z.string().uuid(),
   environmentId: z.string().uuid(),
-  key: z.string(),
+  hasUsername: z.boolean().default(false),
+  hasPassword: z.boolean().default(false),
+  loginUrl: z.string().nullable().optional(),
+  key: z.string().optional(),
   description: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
 });
 export type CredentialResponse = z.infer<typeof CredentialResponseSchema>;
 

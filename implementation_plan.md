@@ -211,8 +211,8 @@ testpilot/
 | # | Task | Details | Output |
 |---|------|---------|--------|
 | 1.1 | **Database schema — projects** | Prisma models: `Project`, `Environment`, `Credential` (encrypted), `Page`, `PageElement`, `PageSnapshot`, `CrawlJob` | ✅ **Completed** (Migration applied + 30 performance indexes added) |
-| 1.2 | **Project CRUD API** | `POST/GET/PUT/DELETE /api/projects`. Validation with Zod. Swagger docs. | API tested via Swagger |
-| 1.3 | **Environment & credential management** | `POST /api/projects/:id/environments`. Credentials encrypted with AES-256-GCM before storage. | Secrets never in plaintext |
+| 1.2 | **Project CRUD API** | `POST/GET/PUT/DELETE /api/projects`. Validation with Zod. Swagger docs. | ✅ **Completed** (API tested via Swagger & unit tests) |
+| 1.3 | **Environment & credential management** | `POST /api/projects/:id/environments`. Credentials encrypted with AES-256-GCM before storage. | ✅ **Completed** (AES-256-GCM encryption & secrets never in plaintext) |
 | 1.4 | **New Project Wizard (UI)** | Multi-step form: name → URL → environment → credentials → crawl settings → test preferences. React Hook Form + Zod validation. | Wizard creates project |
 | 1.5 | **Projects Dashboard (UI)** | Card grid showing projects, status badges, last crawl date, test count. Search + filter. | Dashboard lists projects |
 | 1.6 | **Crawler Engine** | Playwright-based crawler using Crawlee or custom. Configurable depth. Respects robots.txt. Rate-limited. Discovers all routes via link following + sitemap. | Crawls SauceDemo fully |

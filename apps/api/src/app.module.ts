@@ -5,6 +5,8 @@ import { QueueModule } from "./queue/queue.module";
 import { HealthModule } from "./health/health.module";
 import { AuthModule } from "./auth/auth.module";
 import { StorageModule } from "./storage/storage.module";
+import { CryptoModule } from "./common/crypto/crypto.module";
+import { ProjectsModule } from "./projects/projects.module";
 
 @Module({
   imports: [
@@ -33,10 +35,12 @@ import { StorageModule } from "./storage/storage.module";
     }),
 
     PrismaModule,
+    CryptoModule,
     QueueModule,
     HealthModule,
     AuthModule,
     StorageModule,
+    ProjectsModule,
   ],
 })
 export class AppModule {}
