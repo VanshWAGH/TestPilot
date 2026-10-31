@@ -1,11 +1,31 @@
+import * as dotenv from "dotenv";
+import * as path from "path";
+
+// Load environment variables robustly across all execution modes
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
+dotenv.config({ path: path.resolve(__dirname, "../../.env.local") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
+
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { Logger, ValidationPipe } from "@nestjs/common";
+import { ValidationPipe } from "@nestjs/common";
+import { Logger } from "nestjs-pino";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const logger = new Logger("Bootstrap");
+  const app = await NestFactory.create(AppModule, {
+    // Disable NestJS default logger; Pino will handle everything
+    bufferLogs: true,
+  });
+
+  // Use Pino logger globally (structured JSON in production, pretty in dev)
+  const logger = app.get(Logger);
+  app.useLogger(logger);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -19,8 +39,11 @@ async function bootstrap() {
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
   });
 
-  app.setGlobalPrefix("api/v1");
+  app.setGlobalPrefix("api/v1", {
+    exclude: ["admin/queues(.*)"],
+  });
 
+  // --- Swagger API Documentation ---
   const config = new DocumentBuilder()
     .setTitle("TestPilot Platform API")
     .setDescription("Self-Healing Playwright Test Automation Platform API")
@@ -33,8 +56,10 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  logger.log(`🚀 API Server running on: http://localhost:${port}/api/v1`);
-  logger.log(`📖 Swagger API Docs available at: http://localhost:${port}/api/docs`);
+
+  logger.log(`🚀 API Server running on: http://localhost:${port}/api/v1`, "Bootstrap");
+  logger.log(`📖 Swagger API Docs available at: http://localhost:${port}/api/docs`, "Bootstrap");
+  logger.log(`📊 BullMQ Queue Board available at: http://localhost:${port}/admin/queues`, "Bootstrap");
 }
 
 bootstrap();

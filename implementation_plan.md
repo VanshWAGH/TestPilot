@@ -185,19 +185,19 @@ testpilot/
 |---|------|---------|--------|
 | 0.1 | **Initialize monorepo** | Turborepo + pnpm workspaces. Create `apps/web`, `apps/api`, `packages/shared`, `packages/db` | ✅ **Completed** (Compiling monorepo) |
 | 0.2 | **Next.js app shell** | Next.js 15 + TypeScript + Tailwind CSS + shadcn/ui. App router. Layout with sidebar nav. | ✅ **Completed** (Empty dashboard renders + shadcn UI) |
-| 0.3 | **NestJS app shell** | NestJS + TypeScript + Swagger. Health endpoint at `/api/health`. Pino logger. | `GET /api/health → 200` |
-| 0.4 | **PostgreSQL + Prisma** | Docker Compose with Postgres 16. Prisma schema with `User`, `Workspace` tables. Initial migration. | `npx prisma migrate dev` succeeds |
-| 0.5 | **Redis + BullMQ** | Docker Compose with Redis 7. BullMQ board at `/admin/queues`. | Queue dashboard visible |
-| 0.6 | **Authentication** | Clerk integration for both frontend and backend. JWT middleware on NestJS. | Login flow works end-to-end |
-| 0.7 | **Docker Compose** | Full local dev: `docker compose up` starts Postgres, Redis, API, Web. | One-command local dev |
-| 0.8 | **CI pipeline** | GitHub Actions: lint, type-check, build, test (unit) on every PR. | Green CI on main |
-| 0.9 | **Shared package** | Zod schemas for API request/response types, shared between web & api. | Import `@testpilot/shared` works |
-| 0.10 | **S3/MinIO setup** | MinIO container for local dev. S3 client utility with presigned URL support. | File upload/download works |
+| 0.3 | **NestJS app shell** | NestJS + TypeScript + Swagger. Health endpoint at `/api/health`. Pino logger. | ✅ **Completed** (`GET /api/health → 200`) |
+| 0.4 | **PostgreSQL + Prisma** | Docker Compose with Postgres 16. Prisma schema with `User`, `Workspace` tables. Initial migration. | ✅ **Completed** (`prisma migrate dev` succeeds) |
+| 0.5 | **Redis + BullMQ** | Docker Compose with Redis 7. BullMQ board at `/admin/queues`. | ✅ **Completed** (Queue dashboard visible & 5 queues registered) |
+| 0.6 | **Authentication** | Clerk integration for both frontend and backend. JWT middleware on NestJS. | ✅ **Completed** (Clerk Auth on Next.js & NestJS JWT AuthGuard) |
+| 0.7 | **Docker Compose** | Full local dev: `docker compose up` starts Postgres, Redis, API, Web. | ✅ **Completed** (One-command local dev with Postgres, Redis, MinIO, API & Web) |
+| 0.8 | **CI pipeline** | GitHub Actions: lint, type-check, build, test (unit) on every PR. | ✅ **Completed** (GitHub Actions CI on PR & main) |
+| 0.9 | **Shared package** | Zod schemas for API request/response types, shared between web & api. | ✅ **Completed** (Import `@testpilot/shared` works in web & api) |
+| 0.10 | **Storage setup (Free Supabase Storage)** | Supabase Storage integration (1GB free tier) with presigned URLs, upload/download, and local fallback. | ✅ **Completed** (Free cloud storage with presigned URLs) |
 
 #### Definition of Done
 - [ ] `pnpm dev` starts all services
-- [ ] `docker compose up` starts all infrastructure
-- [ ] CI passes on a trivial PR
+- [x] `docker compose up` starts all infrastructure
+- [x] CI passes on a trivial PR
 - [ ] Authenticated user can see empty dashboard
 
 ---
@@ -210,7 +210,7 @@ testpilot/
 
 | # | Task | Details | Output |
 |---|------|---------|--------|
-| 1.1 | **Database schema — projects** | Prisma models: `Project`, `Environment`, `Credential` (encrypted), `Page`, `PageElement`, `PageSnapshot`, `CrawlJob` | Migration runs cleanly |
+| 1.1 | **Database schema — projects** | Prisma models: `Project`, `Environment`, `Credential` (encrypted), `Page`, `PageElement`, `PageSnapshot`, `CrawlJob` | ✅ **Completed** (Migration applied + 30 performance indexes added) |
 | 1.2 | **Project CRUD API** | `POST/GET/PUT/DELETE /api/projects`. Validation with Zod. Swagger docs. | API tested via Swagger |
 | 1.3 | **Environment & credential management** | `POST /api/projects/:id/environments`. Credentials encrypted with AES-256-GCM before storage. | Secrets never in plaintext |
 | 1.4 | **New Project Wizard (UI)** | Multi-step form: name → URL → environment → credentials → crawl settings → test preferences. React Hook Form + Zod validation. | Wizard creates project |

@@ -8,6 +8,12 @@
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
@@ -16,6 +22,9 @@
       "cache": false
     },
     "db:migrate": {
+      "cache": false
+    },
+    "db:deploy": {
       "cache": false
     }
   }
