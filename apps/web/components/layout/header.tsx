@@ -1,4 +1,7 @@
 import { Bell, Github, ExternalLink } from "lucide-react";
+import { Show, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { Suspense } from "react";
 
 export function Header() {
   return (
@@ -25,13 +28,34 @@ export function Header() {
           <Bell className="w-4 h-4" />
         </button>
 
-        <button className="h-9 w-9 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+        <a
+          href="https://github.com"
+          target="_blank"
+          rel="noreferrer"
+          className="h-9 w-9 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+        >
           <Github className="w-4 h-4" />
-        </button>
+        </a>
 
-        <div className="h-8 w-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-xs font-semibold text-primary">
-          TP
-        </div>
+        <Suspense fallback={<div className="h-8 w-8 rounded-full bg-secondary animate-pulse" />}>
+          <Show when="signed-out">
+            <div className="flex items-center gap-2">
+              <Link href="/sign-in">
+                <button className="text-xs font-medium px-3 py-1.5 rounded-md bg-secondary hover:bg-secondary/80 text-foreground transition-colors">
+                  Sign in
+                </button>
+              </Link>
+              <Link href="/sign-up">
+                <button className="text-xs font-semibold px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground transition-colors">
+                  Sign up
+                </button>
+              </Link>
+            </div>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
+        </Suspense>
       </div>
     </header>
   );
