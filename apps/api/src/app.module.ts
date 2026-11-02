@@ -7,6 +7,7 @@ import { AuthModule } from "./auth/auth.module";
 import { StorageModule } from "./storage/storage.module";
 import { CryptoModule } from "./common/crypto/crypto.module";
 import { ProjectsModule } from "./projects/projects.module";
+import { CrawlerModule } from "./crawler/crawler.module";
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ProjectsModule } from "./projects/projects.module";
     AuthModule,
     StorageModule,
     ProjectsModule,
+    CrawlerModule,
   ],
 })
 export class AppModule {}
