@@ -16,6 +16,7 @@ import { AppModule } from "./app.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ValidationPipe } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
+import { IoAdapter } from "@nestjs/platform-socket.io";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -39,6 +40,9 @@ async function bootstrap() {
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
   });
 
+  // Use Socket.IO WebSocket adapter
+  app.useWebSocketAdapter(new IoAdapter(app));
+
   app.setGlobalPrefix("api/v1", {
     exclude: ["admin/queues(.*)"],
   });
@@ -60,6 +64,7 @@ async function bootstrap() {
   logger.log(`🚀 API Server running on: http://localhost:${port}/api/v1`, "Bootstrap");
   logger.log(`📖 Swagger API Docs available at: http://localhost:${port}/api/docs`, "Bootstrap");
   logger.log(`📊 BullMQ Queue Board available at: http://localhost:${port}/admin/queues`, "Bootstrap");
+  logger.log(`🔌 WebSocket gateway live at: ws://localhost:${port}`, "Bootstrap");
 }
 
 bootstrap();

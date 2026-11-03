@@ -16,6 +16,7 @@ export const TriggerCrawlSchema = z.object({
   maxPages: z.number().int().min(1).max(100).default(30),
   allowedDomains: z.array(z.string()).optional(),
   excludePatterns: z.array(z.string()).optional(),
+  incremental: z.boolean().default(true),
 });
 export type TriggerCrawlInput = z.infer<typeof TriggerCrawlSchema>;
 
@@ -49,6 +50,7 @@ export const CrawlJobResponseSchema = z.object({
   status: CrawlStatusSchema,
   pagesDiscovered: z.number().int().nonnegative().default(0),
   pagesCrawled: z.number().int().nonnegative().default(0),
+  pagesSkipped: z.number().int().nonnegative().default(0),
   errorsCount: z.number().int().nonnegative().default(0),
   maxDepth: z.number().int(),
   maxPages: z.number().int(),
@@ -79,6 +81,10 @@ export const PageResponseSchema = z.object({
   httpStatus: z.number().int().nullable().optional(),
   elementsCount: z.number().int().nonnegative().default(0),
   elements: z.array(ElementMetadataSchema).optional(),
+  domFingerprint: z.string().nullable().optional(),
+  accessibilityFingerprint: z.string().nullable().optional(),
+  contentHash: z.string().nullable().optional(),
+  isSkipped: z.boolean().optional(),
   latestSnapshot: PageSnapshotResponseSchema.nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
