@@ -222,16 +222,16 @@ testpilot/
 | 1.10 | **Console log capture** | Capture browser console errors/warnings during crawl. Store per page. | ✅ **Completed** (Console errors and warnings captured into PageSnapshot) |
 | 1.11 | **Element fingerprinting** | Generate stable fingerprints per element: hash of (role + accessible name + test-id + text content + DOM path + attributes). Used for change detection. | ✅ **Completed** (Deterministic SHA-256 fingerprinting for elements and pages) |
 | 1.12 | **Route graph** | Build a directed graph of page→page navigation links. Store as adjacency list. | ✅ **Completed** (Directed route graph queryable via `/api/projects/:projectId/route-graph`) |
-| 1.13 | **Crawl progress (UI)** | Real-time WebSocket feed: pages discovered, extraction status, thumbnails. Progress bar. | Live crawl progress |
+| 1.13 | **Crawl progress (UI)** | Real-time WebSocket feed: pages discovered, extraction status, thumbnails. Progress bar. | ✅ **Completed** (`CrawlerGateway` (Socket.IO) broadcasts per-page events with thumbnail URLs, stage, element count; `CrawlerDashboard` React component shows live progress bar, stats, feed & thumbnail grid at `/crawler`) |
 | 1.14 | **Crawl Queue (BullMQ)** | Crawl jobs processed via BullMQ worker. Retry on failure. Dead-letter queue for permanently failed pages. | ✅ **Completed** (BullMQ worker with real-time progress reporting) |
-| 1.15 | **Incremental re-crawl** | Compare page fingerprint with last crawl. Skip unchanged pages. Only re-extract changed pages. | Re-crawl is fast |
+| 1.15 | **Incremental re-crawl** | Compare page fingerprint with last crawl. Skip unchanged pages. Only re-extract changed pages. | ✅ **Completed** (Fingerprint map loaded from DB before crawl; content-hash compared via quick DOM text snippet; unchanged pages emitted as `skipped` WS events and counted in progress; child links still discovered from skipped pages; `incremental` flag in `TriggerCrawlDto`) |
 
 #### Definition of Done
 - [x] Create a project for SauceDemo via wizard
 - [x] Crawl discovers login, inventory, cart, checkout pages
 - [x] DOM, a11y tree, screenshots, HAR, console logs stored per page
 - [x] Element fingerprints generated
-- [ ] Crawl progress shows live in UI
+- [x] Crawl progress shows live in UI
 
 ---
 

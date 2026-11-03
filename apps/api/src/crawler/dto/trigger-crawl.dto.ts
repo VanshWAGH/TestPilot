@@ -80,6 +80,14 @@ export class TriggerCrawlDto {
   rateLimitDelayMs?: number = 300;
 
   @ApiPropertyOptional({
+    description: "Whether to perform incremental re-crawl by comparing page fingerprints and skipping unchanged pages.",
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  incremental?: boolean = true;
+
+  @ApiPropertyOptional({
     description: "If true, delegates job to BullMQ background worker. If false, executes synchronously.",
     default: false,
   })

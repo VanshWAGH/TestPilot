@@ -11,6 +11,7 @@ import { chromium, Browser, BrowserContext, Page as PlaywrightPage } from "playw
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { QUEUES } from "../queue/queue.constants";
+import { CrawlerGateway } from "./crawler.gateway";
 
 export interface CrawlProgressEvent {
   jobId: string;
@@ -18,7 +19,14 @@ export interface CrawlProgressEvent {
   status: "pending" | "in_progress" | "completed" | "failed";
   pagesDiscovered: number;
   pagesCrawled: number;
+  pagesSkipped: number;
   currentUrl?: string;
+  currentStage?: string;
+  extractionStatus?: string;
+  thumbnailUrl?: string | null;
+  pageTitle?: string;
+  elementsCount?: number;
+  message?: string;
   error?: string;
 }
 
@@ -51,7 +59,46 @@ export class CrawlerService {
     @Optional()
     @InjectQueue(QUEUES.CRAWL)
     private readonly crawlQueue?: Queue,
+    @Optional()
+    private readonly crawlerGateway?: CrawlerGateway,
   ) {}
+
+  /**
+   * Broadcasts a progress event via WebSocket and optional callback.
+   */
+  private emitProgress(
+    event: CrawlProgressEvent,
+    maxPages: number,
+    onProgress?: (progress: CrawlProgressEvent) => void,
+  ) {
+    const percentComplete = maxPages > 0
+      ? Math.min(100, Math.round((event.pagesCrawled / maxPages) * 100))
+      : 0;
+
+    if (this.crawlerGateway?.server) {
+      this.crawlerGateway.broadcastCrawlProgress({
+        jobId: event.jobId,
+        projectId: event.projectId,
+        status: event.status,
+        pagesCrawled: event.pagesCrawled,
+        pagesDiscovered: event.pagesDiscovered,
+        pagesSkipped: event.pagesSkipped,
+        currentUrl: event.currentUrl,
+        currentStage: event.currentStage,
+        extractionStatus: event.extractionStatus,
+        thumbnailUrl: event.thumbnailUrl,
+        pageTitle: event.pageTitle,
+        elementsCount: event.elementsCount,
+        message: event.message,
+        percentComplete,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (onProgress) {
+      onProgress(event);
+    }
+  }
 
   /**
    * Triggers a crawl job. If async is requested and queue is available, adds to BullMQ; otherwise runs immediately.
@@ -289,6 +336,7 @@ export class CrawlerService {
 
   /**
    * Core execution engine for crawling target web applications.
+   * Supports incremental re-crawl: skips pages whose fingerprint hasn't changed.
    */
   async executeCrawl(
     crawlJobId: string,
@@ -323,7 +371,27 @@ export class CrawlerService {
     const maxDepth = options.maxDepth ?? crawlJob.depth ?? 2;
     const maxPages = options.maxPages ?? 30;
     const respectRobotsTxt = options.respectRobotsTxt ?? true;
+    const incremental = options.incremental ?? true;
     let rateLimitDelayMs = options.rateLimitDelayMs ?? 300;
+
+    // Build a fingerprint map for incremental re-crawl:
+    // Maps normalizedUrl -> { domFingerprint, contentHash }
+    let previousFingerprintMap = new Map<string, { domFingerprint: string | null; contentHash: string | null }>();
+    if (incremental) {
+      const existingPages = await this.prisma.page.findMany({
+        where: { projectId },
+        select: { url: true, domFingerprint: true, contentHash: true },
+      });
+      for (const p of existingPages) {
+        previousFingerprintMap.set(this.normalizeUrl(p.url), {
+          domFingerprint: p.domFingerprint,
+          contentHash: p.contentHash,
+        });
+      }
+      this.logger.log(
+        `Incremental re-crawl: loaded ${previousFingerprintMap.size} existing page fingerprints`,
+      );
+    }
 
     // Resolve entrypoint URL
     const entryUrl =
@@ -437,6 +505,7 @@ export class CrawlerService {
       const routeGraphEdges: RouteGraphEdge[] = [];
       const urlToPageId = new Map<string, string>();
       let pagesCrawled = 0;
+      let pagesSkipped = 0;
 
       // 3. Handle Authentication if credentials exist
       let initialSeedUrl = entryUrl;
@@ -463,8 +532,19 @@ export class CrawlerService {
               loginScreenshotUrl = res.publicUrl || res.path;
             } catch {}
 
-            const savedLoginPage = await this.prisma.page.create({
-              data: {
+            const savedLoginPage = await this.prisma.page.upsert({
+              where: {
+                id: urlToPageId.get(this.normalizeUrl(authUrl)) || "00000000-0000-0000-0000-000000000000",
+              },
+              update: {
+                crawlJobId,
+                title: loginExtracted.title || "Login",
+                domFingerprint: loginExtracted.domFingerprint,
+                accessibilityFingerprint: loginExtracted.accessibilityFingerprint,
+                contentHash: loginExtracted.contentHash,
+                lastCrawledAt: new Date(),
+              },
+              create: {
                 projectId,
                 crawlJobId,
                 url: authUrl,
@@ -520,6 +600,22 @@ export class CrawlerService {
             }
             pagesCrawled++;
             initialParentUrl = authUrl;
+
+            // Broadcast login page crawled
+            this.emitProgress({
+              jobId: crawlJobId,
+              projectId,
+              status: "in_progress",
+              pagesDiscovered: 1,
+              pagesCrawled,
+              pagesSkipped,
+              currentUrl: authUrl,
+              currentStage: "authenticating",
+              extractionStatus: "done",
+              thumbnailUrl: loginScreenshotUrl,
+              pageTitle: loginExtracted.title || "Login",
+              elementsCount: loginExtracted.elements.length,
+            }, maxPages, onProgress);
           } catch (loginExtractErr) {
             this.logger.warn(`Failed extracting login page: ${(loginExtractErr as Error).message}`);
           }
@@ -604,6 +700,92 @@ export class CrawlerService {
 
         visitedUrls.add(normalized);
 
+        // ─── Incremental fingerprint check ───────────────────────────────────────
+        // If this URL was crawled before and we have a previous fingerprint,
+        // do a lightweight HEAD request + quick page.goto to just get new fingerprint,
+        // then compare. If unchanged, skip full extraction.
+        if (incremental && previousFingerprintMap.has(normalized)) {
+          const prev = previousFingerprintMap.get(normalized)!;
+          this.logger.debug(`Incremental check for ${item.url} (prev fingerprint: ${prev.contentHash?.slice(0, 8)}...)`);
+
+          try {
+            await page.goto(item.url, { waitUntil: "domcontentloaded", timeout: 20000 });
+            await page.waitForTimeout(300);
+
+            // Get just the content to compute a quick hash
+            const htmlSnippet = await page.evaluate(() => {
+              return document.body?.innerText?.slice(0, 2000) || document.documentElement?.outerHTML?.slice(0, 4000) || "";
+            });
+
+            // Quick SHA-256 of the snippet for comparison
+            const encoder = new TextEncoder();
+            const data = encoder.encode(htmlSnippet);
+            const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const quickHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+
+            // Compare with stored contentHash (first 32 chars)
+            const prevHashPrefix = (prev.contentHash || "").slice(0, 32);
+
+            if (prevHashPrefix && quickHash === prevHashPrefix) {
+              // Page unchanged — skip extraction
+              pagesSkipped++;
+              this.logger.log(`[SKIP] Unchanged page (${pagesSkipped} skipped): ${item.url}`);
+
+              this.emitProgress({
+                jobId: crawlJobId,
+                projectId,
+                status: "in_progress",
+                pagesDiscovered: visitedUrls.size + queue.length,
+                pagesCrawled,
+                pagesSkipped,
+                currentUrl: item.url,
+                currentStage: "incremental_check",
+                extractionStatus: "skipped",
+                message: `Skipped unchanged page`,
+              }, maxPages, onProgress);
+
+              // Still update DB progress
+              await this.prisma.crawlJob.update({
+                where: { id: crawlJobId },
+                data: {
+                  pagesCrawled,
+                  pagesFound: visitedUrls.size + queue.length,
+                },
+              });
+
+              // Still discover child links (even if we skip re-extraction)
+              if (item.depth < maxDepth) {
+                const discoveredLinks = await page.evaluate((): string[] => {
+                  return Array.from(document.querySelectorAll("a[href]"))
+                    .map(a => (a as HTMLAnchorElement).href)
+                    .filter(h => h && !h.startsWith("javascript:") && !h.startsWith("mailto:") && !h.startsWith("tel:"));
+                });
+
+                for (const link of discoveredLinks) {
+                  const normLink = this.normalizeUrl(link);
+                  if (!visitedUrls.has(normLink) && !queue.some((q) => this.normalizeUrl(q.url) === normLink)) {
+                    try {
+                      const pl = new URL(link);
+                      if (pl.host.toLowerCase() === targetHost.toLowerCase()) {
+                        queue.push({ url: link, depth: item.depth + 1, parentUrl: item.url });
+                      }
+                    } catch {}
+                  }
+                }
+              }
+
+              continue;
+            }
+
+            this.logger.log(`Page changed, re-extracting: ${item.url}`);
+          } catch (incErr) {
+            this.logger.warn(`Incremental check failed for ${item.url}, proceeding with full crawl: ${(incErr as Error).message}`);
+            // Navigate was already attempted; fall through to full crawl below
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
         // Rate limiting polite delay
         if (rateLimitDelayMs > 0 && pagesCrawled > 0) {
           await new Promise((r) => setTimeout(r, rateLimitDelayMs));
@@ -613,17 +795,18 @@ export class CrawlerService {
           `Crawling [${pagesCrawled + 1}/${maxPages}] (Depth ${item.depth}): ${item.url}`,
         );
 
-        // Notify progress callback
-        if (onProgress) {
-          onProgress({
-            jobId: crawlJobId,
-            projectId,
-            status: "in_progress",
-            pagesDiscovered: visitedUrls.size + queue.length,
-            pagesCrawled,
-            currentUrl: item.url,
-          });
-        }
+        // Notify navigating
+        this.emitProgress({
+          jobId: crawlJobId,
+          projectId,
+          status: "in_progress",
+          pagesDiscovered: visitedUrls.size + queue.length,
+          pagesCrawled,
+          pagesSkipped,
+          currentUrl: item.url,
+          currentStage: "navigating",
+          extractionStatus: "in_progress",
+        }, maxPages, onProgress);
 
         // Navigate page
         consoleLogsBuffer.length = 0; // Clear logs for current page
@@ -756,6 +939,22 @@ export class CrawlerService {
           });
         }
 
+        // Broadcast page crawled with thumbnail
+        this.emitProgress({
+          jobId: crawlJobId,
+          projectId,
+          status: "in_progress",
+          pagesDiscovered: visitedUrls.size + queue.length,
+          pagesCrawled,
+          pagesSkipped,
+          currentUrl: currentActiveUrl,
+          currentStage: "extracting",
+          extractionStatus: "done",
+          thumbnailUrl: screenshotUrl,
+          pageTitle: extracted.title,
+          elementsCount: extracted.elements.length,
+        }, maxPages, onProgress);
+
         // Link Discovery: enqueue undiscovered child links if depth allows
         if (item.depth < maxDepth) {
           for (const link of extracted.discoveredLinks) {
@@ -813,9 +1012,17 @@ export class CrawlerService {
       });
 
       this.logger.log(
-        `Crawl job ${crawlJobId} completed! Crawled ${pagesCrawled} pages, discovered ${visitedUrls.size + queue.length} routes.`,
+        `Crawl job ${crawlJobId} completed! Crawled ${pagesCrawled} pages, skipped ${pagesSkipped} unchanged, discovered ${visitedUrls.size + queue.length} routes.`,
       );
 
+      // Broadcast completion
+      if (this.crawlerGateway?.server) {
+        this.crawlerGateway.broadcastCrawlCompleted(crawlJobId, projectId, {
+          pagesCrawled,
+          pagesSkipped,
+          pagesDiscovered: visitedUrls.size + queue.length,
+        });
+      }
       if (onProgress) {
         onProgress({
           jobId: crawlJobId,
@@ -823,6 +1030,7 @@ export class CrawlerService {
           status: "completed",
           pagesDiscovered: visitedUrls.size + queue.length,
           pagesCrawled,
+          pagesSkipped,
         });
       }
 
@@ -840,6 +1048,9 @@ export class CrawlerService {
         },
       });
 
+      if (this.crawlerGateway?.server) {
+        this.crawlerGateway.broadcastCrawlFailed(crawlJobId, projectId, errMsg);
+      }
       if (onProgress) {
         onProgress({
           jobId: crawlJobId,
@@ -847,6 +1058,7 @@ export class CrawlerService {
           status: "failed",
           pagesDiscovered: 0,
           pagesCrawled: 0,
+          pagesSkipped: 0,
           error: errMsg,
         });
       }

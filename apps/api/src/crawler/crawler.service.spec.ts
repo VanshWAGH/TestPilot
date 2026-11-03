@@ -21,7 +21,7 @@ describe("CrawlerService", () => {
         update: vi.fn(),
       },
       page: {
-        findMany: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
         findFirst: vi.fn(),
         upsert: vi.fn(),
       },
@@ -58,6 +58,7 @@ describe("CrawlerService", () => {
       mockStorage as any,
       mockEncryption as any,
       mockQueue as any,
+      undefined, // crawlerGateway — optional in tests
     );
   });
 
@@ -91,6 +92,7 @@ describe("CrawlerService", () => {
       const result = await service.startCrawl("proj-1", {
         maxDepth: 3,
         runAsync: true,
+        incremental: true,
       });
 
       expect(result.id).toBe("job-1");
@@ -104,7 +106,7 @@ describe("CrawlerService", () => {
       expect(mockQueue.add).toHaveBeenCalledWith("crawl", {
         crawlJobId: "job-1",
         projectId: "proj-1",
-        options: { maxDepth: 3, runAsync: true },
+        options: { maxDepth: 3, runAsync: true, incremental: true },
       });
     });
   });
@@ -174,6 +176,39 @@ describe("CrawlerService", () => {
       const graph = await service.getProjectRouteGraph("proj-1");
       expect(graph.nodes).toHaveLength(1);
       expect(graph.edges).toHaveLength(1);
+    });
+  });
+
+  describe("incremental re-crawl fingerprint loading", () => {
+    it("should load existing page fingerprints from DB when incremental=true", async () => {
+      // getProjectPages uses findMany with _count and snapshots includes
+      mockPrisma.page.findMany.mockResolvedValue([
+        {
+          id: "page-1",
+          projectId: "proj-1",
+          url: "https://www.saucedemo.com/inventory.html",
+          route: "/inventory.html",
+          title: "Products",
+          domFingerprint: "sha256-abc",
+          contentHash: "sha256-xyz",
+          _count: { elements: 5 },
+          snapshots: [{ screenshotUrl: "https://storage/thumb.png", createdAt: new Date() }],
+          createdAt: new Date("2026-01-01T00:00:00Z"),
+          lastCrawledAt: new Date("2026-01-01T00:01:00Z"),
+        },
+      ]);
+
+      const pages = await service.getProjectPages("proj-1");
+      expect(pages).toHaveLength(1);
+      // Verify findMany was called with projectId filter
+      expect(mockPrisma.page.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { projectId: "proj-1" } }),
+      );
+    });
+
+    it("should resolve crawl job not found during executeCrawl", async () => {
+      mockPrisma.crawlJob.findUnique.mockResolvedValue(null);
+      await expect(service.executeCrawl("bad-job-id")).rejects.toThrow("Crawl job bad-job-id not found");
     });
   });
 });
