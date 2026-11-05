@@ -243,11 +243,11 @@ testpilot/
 
 | # | Task | Details | Output |
 |---|------|---------|--------|
-| 2.1 | **Page Model assembly** | Combine DOM, a11y tree, element metadata, route graph, and API contracts into a structured "Page Model" JSON per page. | Page Model JSON per page |
-| 2.2 | **LLM integration (OpenRouter)** | Service to call LLM via OpenRouter API. Support for structured JSON output via function calling. Prompt/response logging with token counts. | LLM calls work |
-| 2.3 | **Scenario generation (LLM Pass 1)** | Feed Page Model to LLM. Output: structured scenarios as JSON array. Each scenario: title, type (smoke/functional/visual/etc.), preconditions, steps (action + locator + data), assertions, risk level, required test data. | Scenarios stored in DB |
-| 2.4 | **Scenario review UI** | Table view of generated scenarios. Each row: title, type badge, risk badge, step count. Expand to see full steps + assertions. Actions: approve ✅, reject ❌, edit ✏️. Batch approve. | Scenarios reviewable |
-| 2.5 | **Scenario editing** | Inline editing of scenario steps, assertions, test data. Add/remove steps. Change locators. | Edits saved |
+| 2.1 | **Page Model assembly** | Combine DOM, a11y tree, element metadata, route graph, and API contracts into a structured "Page Model" JSON per page. | ✅ **Completed** (Combined DOM, a11y tree, element metadata, route graph, and API contracts into structured Page Model JSON per page & Project Model via `PageModelService`, schemas exported in `@testpilot/shared`) |
+| 2.2 | **LLM integration (OpenRouter)** | Service to call LLM via OpenRouter API. Support for structured JSON output via function calling. Prompt/response logging with token counts. | ✅ **Completed** (OpenRouter API integration with structured JSON object mode, token usage & latency logging, and typed error handling in `LlmService`) |
+| 2.3 | **Scenario generation (LLM Pass 1)** | Feed Page Model to LLM. Output: structured scenarios as JSON array. Each scenario: title, type (smoke/functional/visual/etc.), preconditions, steps (action + locator + data), assertions, risk level, required test data. | ✅ **Completed** (LLM Pass 1 scenario generation via `ScenarioGeneratorService`, persisted into Postgres DB with title, type, riskLevel, steps, assertions, testData, full query/update/batch approval APIs via `ScenariosController`) |
+| 2.4 | **Scenario review UI** | Table view of generated scenarios. Each row: title, type badge, risk badge, step count. Expand to see full steps + assertions. Actions: approve ✅, reject ❌, edit ✏️. Batch approve. | ✅ **Completed** (Rich table view with expand/collapse steps & assertions, multi-select batch approval/rejection toolbar, search & type/risk/status filters, generator dialog at `/scenarios`) |
+| 2.5 | **Scenario editing** | Inline editing of scenario steps, assertions, test data. Add/remove steps. Change locators. | ✅ **Completed** (Interactive `ScenarioEditDialog` with step adding/removal, action selectors, locator editing, assertion configurations, and test data JSON validation with live optimistic updates) |
 | 2.6 | **Test code generation (LLM Pass 2)** | Take approved scenarios + deterministic templates → generate Playwright test files. TypeScript compilation check. Page Object pattern. | `.spec.ts` files generated |
 | 2.7 | **Page Object generation** | Generate page object classes from Page Model. Encapsulate locators, actions, assertions. | `.page.ts` files generated |
 | 2.8 | **Fixture generation** | Generate Playwright fixtures for auth state, test data setup/teardown. | `fixtures.ts` generated |
@@ -261,7 +261,7 @@ testpilot/
 
 #### Definition of Done
 - [ ] LLM generates 10–15 scenarios for SauceDemo
-- [ ] Scenarios reviewable/editable in UI
+- [x] Scenarios reviewable/editable in UI
 - [ ] Approved scenarios produce valid Playwright TypeScript code
 - [ ] Code committed to GitHub repo via PR
 - [ ] Code compiles and tests are discoverable

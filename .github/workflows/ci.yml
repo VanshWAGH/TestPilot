@@ -39,6 +39,9 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm db:generate
 
+      - name: Build internal packages
+        run: pnpm --filter @testpilot/shared --filter @testpilot/db run build
+
       - name: Lint
         run: pnpm lint
 
@@ -68,6 +71,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: pnpm db:generate
+
+      - name: Build internal packages
+        run: pnpm --filter @testpilot/shared --filter @testpilot/db run build
 
       - name: Run unit tests
         run: pnpm test
