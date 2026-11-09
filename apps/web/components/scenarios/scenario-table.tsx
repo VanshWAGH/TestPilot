@@ -27,6 +27,7 @@ interface ScenarioTableProps {
   onSelectAll: () => void;
   onStatusChange: (id: string, status: "approved" | "rejected") => void;
   onEdit: (scenario: ScenarioItem) => void;
+  onViewCode?: (scenario: ScenarioItem) => void;
   onOpenGenerate: () => void;
 }
 
@@ -37,6 +38,7 @@ export function ScenarioTable({
   onSelectAll,
   onStatusChange,
   onEdit,
+  onViewCode,
   onOpenGenerate,
 }: ScenarioTableProps) {
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -323,6 +325,18 @@ export function ScenarioTable({
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
+
+                        {onViewCode && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-primary hover:text-primary/80 hover:bg-primary/10"
+                            title="Preview Playwright Code (Shiki)"
+                            onClick={() => onViewCode(scenario)}
+                          >
+                            <Code2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -433,6 +447,20 @@ export function ScenarioTable({
                             <pre className="p-2.5 rounded-md bg-background/80 border border-border/50 font-mono text-[11px] text-muted-foreground overflow-x-auto">
                               {JSON.stringify(scenario.testData, null, 2)}
                             </pre>
+                          </div>
+                        )}
+
+                        {onViewCode && (
+                          <div className="pt-2 flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onViewCode(scenario)}
+                              className="text-xs h-7 border-primary/30 text-primary hover:bg-primary/10"
+                            >
+                              <Code2 className="w-3.5 h-3.5 mr-1.5" />
+                              View Generated Code (Shiki)
+                            </Button>
                           </div>
                         )}
                       </div>

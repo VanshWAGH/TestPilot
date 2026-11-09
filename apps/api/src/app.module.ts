@@ -10,6 +10,7 @@ import { ProjectsModule } from "./projects/projects.module";
 import { CrawlerModule } from "./crawler/crawler.module";
 import { LlmModule } from "./llm/llm.module";
 import { ScenariosModule } from "./scenarios/scenarios.module";
+import { GitHubModule } from "./github/github.module";
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ScenariosModule } from "./scenarios/scenarios.module";
     CrawlerModule,
     LlmModule,
     ScenariosModule,
+    GitHubModule,
   ],
 })
 export class AppModule {}

@@ -1,0 +1,58 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { GitHubController } from "./github.controller";
+
+describe("GitHubController", () => {
+  let controller: GitHubController;
+  let mockService: any;
+
+  beforeEach(() => {
+    mockService = {
+      getAppInfo: vi.fn().mockReturnValue({ appName: "TestPilot QA", appSlug: "testpilot-qa" }),
+      getInstallations: vi.fn().mockResolvedValue([{ id: "inst-1" }]),
+      saveInstallation: vi.fn().mockResolvedValue({ id: "inst-1" }),
+      getProjectGitHubStatus: vi.fn().mockResolvedValue({ isConfigured: true }),
+      connectRepo: vi.fn().mockResolvedValue({ githubAppInstalled: true }),
+      disconnectRepo: vi.fn().mockResolvedValue({ success: true }),
+    };
+
+    controller = new GitHubController(mockService);
+  });
+
+  it("getAppInfo delegates to service", () => {
+    const res = controller.getAppInfo();
+    expect(res).toEqual({ appName: "TestPilot QA", appSlug: "testpilot-qa" });
+    expect(mockService.getAppInfo).toHaveBeenCalled();
+  });
+
+  it("getInstallations delegates to service", async () => {
+    const res = await controller.getInstallations();
+    expect(res).toEqual([{ id: "inst-1" }]);
+    expect(mockService.getInstallations).toHaveBeenCalled();
+  });
+
+  it("saveInstallation delegates to service", async () => {
+    const dto = { installationId: "123", accountLogin: "octocat" };
+    const res = await controller.saveInstallation(dto);
+    expect(res).toEqual({ id: "inst-1" });
+    expect(mockService.saveInstallation).toHaveBeenCalledWith(dto);
+  });
+
+  it("getProjectStatus delegates to service", async () => {
+    const res = await controller.getProjectStatus("proj-1");
+    expect(res).toEqual({ isConfigured: true });
+    expect(mockService.getProjectGitHubStatus).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("connectRepo delegates to service", async () => {
+    const dto = { installationId: "123", githubTestRepo: "owner/repo" };
+    const res = await controller.connectRepo("proj-1", dto);
+    expect(res).toEqual({ githubAppInstalled: true });
+    expect(mockService.connectRepo).toHaveBeenCalledWith("proj-1", dto);
+  });
+
+  it("disconnectRepo delegates to service", async () => {
+    const res = await controller.disconnectRepo("proj-1");
+    expect(res).toEqual({ success: true });
+    expect(mockService.disconnectRepo).toHaveBeenCalledWith("proj-1");
+  });
+});

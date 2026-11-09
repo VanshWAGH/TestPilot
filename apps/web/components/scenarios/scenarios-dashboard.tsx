@@ -15,6 +15,8 @@ import {
   Check,
   X,
   Loader2,
+  Code2,
+  FileCode2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { ScenarioTable } from "./scenario-table";
 import { ScenarioEditDialog, ScenarioItem } from "./scenario-edit-dialog";
 import { ScenarioGeneratorDialog } from "./scenario-generator-dialog";
+import { CodePreviewDialog } from "./code-preview-dialog";
+import { SuiteBundleDialog } from "./suite-bundle-dialog";
 
 export interface ProjectOption {
   id: string;
@@ -51,6 +55,8 @@ export function ScenariosDashboard({
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingScenario, setEditingScenario] = useState<ScenarioItem | null>(null);
+  const [previewScenario, setPreviewScenario] = useState<ScenarioItem | null>(null);
+  const [showSuiteBundle, setShowSuiteBundle] = useState(false);
   const [showGeneratorDialog, setShowGeneratorDialog] = useState(false);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
@@ -218,6 +224,17 @@ export function ScenariosDashboard({
               </select>
             </div>
           )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 border-primary/30 text-primary hover:bg-primary/10 shadow-sm"
+            onClick={() => setShowSuiteBundle(true)}
+            disabled={!selectedProjectId}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span>Explore Suite Code</span>
+          </Button>
 
           <Button
             size="sm"
@@ -422,6 +439,7 @@ export function ScenariosDashboard({
         onSelectAll={handleSelectAll}
         onStatusChange={handleStatusChange}
         onEdit={(sc) => setEditingScenario(sc)}
+        onViewCode={(sc) => setPreviewScenario(sc)}
         onOpenGenerate={() => setShowGeneratorDialog(true)}
       />
 
@@ -432,6 +450,27 @@ export function ScenariosDashboard({
         onOpenChange={(open) => !open && setEditingScenario(null)}
         onSave={handleSavedScenario}
       />
+
+      {/* ─── Code Preview Dialog (Task 2.10) ──────────────────────────────── */}
+      {selectedProjectId && (
+        <CodePreviewDialog
+          scenario={previewScenario}
+          projectId={selectedProjectId}
+          open={!!previewScenario}
+          onOpenChange={(open) => !open && setPreviewScenario(null)}
+          onCodeGenerated={() => fetchScenarios()}
+        />
+      )}
+
+      {/* ─── Suite Bundle Explorer Dialog (Task 2.10) ─────────────────────── */}
+      {activeProject && (
+        <SuiteBundleDialog
+          projectId={activeProject.id}
+          projectName={activeProject.name}
+          open={showSuiteBundle}
+          onOpenChange={setShowSuiteBundle}
+        />
+      )}
 
       {/* ─── Generator Dialog ─────────────────────────────────────────────── */}
       {activeProject && (
