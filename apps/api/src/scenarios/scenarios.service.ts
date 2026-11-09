@@ -4,8 +4,11 @@ import { PageModelService } from "./page-model.service";
 import { ScenarioGeneratorService } from "./scenario-generator.service";
 import { PageObjectGeneratorService } from "./page-object-generator.service";
 import { TestCodeGeneratorService } from "./test-code-generator.service";
+import { FixtureGeneratorService } from "./fixture-generator.service";
+import { PlaywrightConfigGeneratorService } from "./playwright-config-generator.service";
 import { GenerateScenariosDto } from "./dto/generate-scenarios.dto";
 import { GenerateCodeDto } from "./dto/generate-code.dto";
+import { GeneratePlaywrightConfigDto } from "./dto/generate-config.dto";
 import { ScenarioQueryDto } from "./dto/scenario-query.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { BatchApproveScenariosDto } from "./dto/batch-approve-scenarios.dto";
@@ -21,6 +24,8 @@ export class ScenariosService {
     private readonly generatorService: ScenarioGeneratorService,
     private readonly pageObjectGenerator: PageObjectGeneratorService,
     private readonly testCodeGenerator: TestCodeGeneratorService,
+    private readonly fixtureGenerator: FixtureGeneratorService,
+    private readonly configGenerator: PlaywrightConfigGeneratorService,
   ) {}
 
   // ─── Page & Project Models ──────────────────────────────────────────────────
@@ -287,5 +292,81 @@ export class ScenariosService {
     }
 
     return testFile;
+  }
+
+  // ─── Fixture & Config Generation (Tasks 2.8 & 2.9) ──────────────────────────
+
+  async generateFixtures(projectId: string) {
+    return await this.fixtureGenerator.generateFixtures(projectId);
+  }
+
+  async generatePlaywrightConfig(
+    projectId: string,
+    options?: GeneratePlaywrightConfigDto,
+  ) {
+    return await this.configGenerator.generateConfig(projectId, options);
+  }
+
+  async getFullSuiteArtifacts(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        pages: true,
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project ${projectId} not found`);
+    }
+
+    // 1. Fetch all generated test files
+    const testFiles = await this.listTestFiles(projectId);
+
+    // 2. Generate Page Objects for all pages
+    const pageObjects = [];
+    for (const page of project.pages) {
+      try {
+        const po = await this.getPageObject(projectId, page.id);
+        pageObjects.push(po);
+      } catch (err: any) {
+        this.logger.warn(`Failed to assemble page object for ${page.id}: ${err.message}`);
+      }
+    }
+
+    // 3. Generate fixtures
+    const fixtures = await this.generateFixtures(projectId);
+
+    // 4. Generate config
+    const config = await this.generatePlaywrightConfig(projectId);
+
+    const totalFiles =
+      testFiles.length +
+      pageObjects.length +
+      1 + // fixtures/index.ts
+      (fixtures.authSetupContent ? 1 : 0) +
+      1; // playwright.config.ts
+
+    return {
+      projectId,
+      projectName: project.name,
+      baseUrl: config.baseUrl,
+      testFiles: testFiles.map((tf) => ({
+        id: tf.id,
+        scenarioId: tf.scenarioId,
+        scenarioTitle: tf.scenario.title,
+        testFilePath: tf.filePath,
+        testContent: tf.content || "",
+        pageObjectPath: tf.pageObjectPath,
+        pageObjectContent: tf.pageObjectContent,
+        compilationStatus: "valid" as const,
+        compilationErrors: [],
+        fileContentHash: tf.fileContentHash,
+        createdAt: tf.createdAt.toISOString(),
+      })),
+      pageObjects,
+      fixtures,
+      config,
+      totalFiles,
+    };
   }
 }

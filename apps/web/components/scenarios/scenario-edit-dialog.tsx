@@ -57,6 +57,7 @@ export interface ScenarioItem {
   steps: ScenarioStep[];
   assertions: ScenarioAssertion[];
   testData?: Record<string, any> | null;
+  testFiles?: any[] | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   createdAt: string;

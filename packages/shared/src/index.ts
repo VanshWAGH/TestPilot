@@ -8,3 +8,4 @@ export * from "./schemas/healing.schema";
 export * from "./schemas/defect.schema";
 export * from "./schemas/baseline.schema";
 export * from "./schemas/events.schema";
+export * from "./schemas/github.schema";

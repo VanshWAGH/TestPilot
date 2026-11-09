@@ -5,6 +5,8 @@ import { PageModelService } from "./page-model.service";
 import { ScenarioGeneratorService } from "./scenario-generator.service";
 import { PageObjectGeneratorService } from "./page-object-generator.service";
 import { TestCodeGeneratorService } from "./test-code-generator.service";
+import { FixtureGeneratorService } from "./fixture-generator.service";
+import { PlaywrightConfigGeneratorService } from "./playwright-config-generator.service";
 import { LlmModule } from "../llm/llm.module";
 import { AuthModule } from "../auth/auth.module";
 
@@ -17,6 +19,8 @@ import { AuthModule } from "../auth/auth.module";
     ScenarioGeneratorService,
     PageObjectGeneratorService,
     TestCodeGeneratorService,
+    FixtureGeneratorService,
+    PlaywrightConfigGeneratorService,
   ],
   exports: [
     ScenariosService,
@@ -24,6 +28,8 @@ import { AuthModule } from "../auth/auth.module";
     ScenarioGeneratorService,
     PageObjectGeneratorService,
     TestCodeGeneratorService,
+    FixtureGeneratorService,
+    PlaywrightConfigGeneratorService,
   ],
 })
 export class ScenariosModule {}

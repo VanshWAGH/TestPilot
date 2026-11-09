@@ -61,9 +61,13 @@ model Project {
   workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name             String
   baseUrl          String            @map("base_url")
-  githubTestRepo   String?           @map("github_test_repo")
-  githubDefectRepo String?           @map("github_defect_repo")
-  autoHealMode     String            @default("suggest") @map("auto_heal_mode") // off, suggest, auto-safe
+  githubTestRepo       String?           @map("github_test_repo")
+  githubDefectRepo     String?           @map("github_defect_repo")
+  githubInstallationId String?           @map("github_installation_id")
+  githubAppInstalled   Boolean           @default(false) @map("github_app_installed")
+  githubBranch         String            @default("main") @map("github_branch")
+  githubOwner          String?           @map("github_owner")
+  autoHealMode         String            @default("suggest") @map("auto_heal_mode") // off, suggest, auto-safe
   defectSystem     String            @default("github_issues") @map("defect_system")
   ciProvider       String            @default("github_actions") @map("ci_provider")
   environments     Environment[]
@@ -346,4 +350,18 @@ model Defect {
   @@index([projectId, status])
   @@index([externalSystem, externalId])
   @@map("defects")
+}
+
+model GitHubInstallation {
+  id             String   @id @default(uuid())
+  installationId String   @unique @map("installation_id")
+  accountLogin   String   @map("account_login")
+  accountType    String   @default("User") @map("account_type") // User or Organization
+  accountAvatar  String?  @map("account_avatar")
+  targetType     String   @default("selected") @map("target_type") // all or selected
+  permissions    Json?    @map("permissions")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("github_installations")
 }
