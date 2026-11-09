@@ -22,6 +22,7 @@ import {
 } from "@nestjs/swagger";
 import { ScenariosService } from "./scenarios.service";
 import { GenerateScenariosDto } from "./dto/generate-scenarios.dto";
+import { GenerateCodeDto } from "./dto/generate-code.dto";
 import { ScenarioQueryDto } from "./dto/scenario-query.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { BatchApproveScenariosDto } from "./dto/batch-approve-scenarios.dto";
@@ -190,5 +191,93 @@ export class ScenariosController {
   ): Promise<any> {
     const reviewer = req?.user?.email ?? req?.auth?.sub;
     return await this.scenariosService.batchApprove(projectId, dto, reviewer);
+  }
+
+  // ─── POST /projects/:projectId/scenarios/:scenarioId/generate-code ──────────
+
+  @Post("projects/:projectId/scenarios/:scenarioId/generate-code")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: "Generate Playwright test code for a single scenario (Pass 2)",
+    description:
+      "Synthesizes Playwright TypeScript test file (.spec.ts) and Page Object (.page.ts) using LLM Pass 2 with compiler check.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "scenarioId", type: String, description: "UUID of the scenario" })
+  @ApiResponse({ status: 201, description: "Generated Playwright test file artifacts" })
+  async generateCodeForScenario(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("scenarioId", ParseUUIDPipe) scenarioId: string,
+    @Body() dto: GenerateCodeDto,
+  ): Promise<any> {
+    return await this.scenariosService.generateTestCode(projectId, scenarioId, {
+      model: dto?.model,
+    });
+  }
+
+  // ─── POST /projects/:projectId/code/generate ────────────────────────────────
+
+  @Post("projects/:projectId/code/generate")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Generate Playwright test code in batch for project scenarios",
+    description:
+      "Generates executable .spec.ts test suites and .page.ts Page Objects for approved scenarios in project.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Array of generated test code artifacts" })
+  async generateBatchCode(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: GenerateCodeDto,
+  ): Promise<any> {
+    return await this.scenariosService.generateBatchTestCode(projectId, dto);
+  }
+
+  // ─── GET /projects/:projectId/pages/:pageId/page-object ─────────────────────
+
+  @Get("projects/:projectId/pages/:pageId/page-object")
+  @ApiOperation({
+    summary: "Generate or retrieve Page Object class for page",
+    description: "Extracts locators, actions, and assertions into a Playwright Page Object class.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "pageId", type: String, description: "UUID of the page" })
+  @ApiResponse({ status: 200, description: "Generated Page Object code" })
+  async getPageObject(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("pageId", ParseUUIDPipe) pageId: string,
+  ): Promise<any> {
+    return await this.scenariosService.getPageObject(projectId, pageId);
+  }
+
+  // ─── GET /projects/:projectId/test-files ────────────────────────────────────
+
+  @Get("projects/:projectId/test-files")
+  @ApiOperation({
+    summary: "List all generated Playwright test files in project",
+    description: "Returns all test files with their file paths, hashes, code, and linked scenarios.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "List of test files" })
+  async listTestFiles(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ): Promise<any> {
+    return await this.scenariosService.listTestFiles(projectId);
+  }
+
+  // ─── GET /projects/:projectId/test-files/:testFileId ────────────────────────
+
+  @Get("projects/:projectId/test-files/:testFileId")
+  @ApiOperation({
+    summary: "Get generated test file details and code",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "testFileId", type: String, description: "UUID of the test file" })
+  @ApiResponse({ status: 200, description: "Test file details and contents" })
+  async getTestFile(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("testFileId", ParseUUIDPipe) testFileId: string,
+  ): Promise<any> {
+    return await this.scenariosService.getTestFile(projectId, testFileId);
   }
 }

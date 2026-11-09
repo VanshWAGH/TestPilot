@@ -224,15 +224,17 @@ model Scenario {
 }
 
 model TestFile {
-  id              String       @id @default(uuid())
-  scenarioId      String       @map("scenario_id")
-  scenario        Scenario     @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  filePath        String       @map("file_path")
-  fileContentHash String       @map("file_content_hash")
-  pageObjectPath  String?      @map("page_object_path")
-  githubCommitSha String?      @map("github_commit_sha")
-  testResults     TestResult[]
-  createdAt       DateTime     @default(now()) @map("created_at")
+  id                String       @id @default(uuid())
+  scenarioId        String       @map("scenario_id")
+  scenario          Scenario     @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  filePath          String       @map("file_path")
+  fileContentHash   String       @map("file_content_hash")
+  content           String?      @db.Text
+  pageObjectPath    String?      @map("page_object_path")
+  pageObjectContent String?      @map("page_object_content") @db.Text
+  githubCommitSha   String?      @map("github_commit_sha")
+  testResults       TestResult[]
+  createdAt         DateTime     @default(now()) @map("created_at")
 
   @@index([scenarioId])
   @@map("test_files")
