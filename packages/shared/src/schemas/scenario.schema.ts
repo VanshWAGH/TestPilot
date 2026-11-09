@@ -124,3 +124,43 @@ export const GeneratedTestCodeArtifactSchema = z.object({
 });
 export type GeneratedTestCodeArtifact = z.infer<typeof GeneratedTestCodeArtifactSchema>;
 
+export const PlaywrightFixtureResponseSchema = z.object({
+  projectId: z.string(),
+  fixtureFilePath: z.string(),
+  fixtureContent: z.string(),
+  authSetupFilePath: z.string().nullable().optional(),
+  authSetupContent: z.string().nullable().optional(),
+  pageObjectsIncluded: z.array(z.string()),
+  hasAuthFixture: z.boolean(),
+  hasTestDataFixture: z.boolean(),
+  compilationStatus: z.enum(["valid", "invalid"]),
+  compilationErrors: z.array(z.string()).default([]),
+});
+export type PlaywrightFixtureResponse = z.infer<typeof PlaywrightFixtureResponseSchema>;
+
+export const PlaywrightConfigResponseSchema = z.object({
+  projectId: z.string(),
+  filePath: z.string(),
+  content: z.string(),
+  baseUrl: z.string(),
+  projects: z.array(z.string()),
+  reporters: z.array(z.string()),
+  hasAuthSetup: z.boolean(),
+  compilationStatus: z.enum(["valid", "invalid"]),
+  compilationErrors: z.array(z.string()).default([]),
+});
+export type PlaywrightConfigResponse = z.infer<typeof PlaywrightConfigResponseSchema>;
+
+export const TestSuiteBundleResponseSchema = z.object({
+  projectId: z.string(),
+  projectName: z.string(),
+  baseUrl: z.string(),
+  testFiles: z.array(GeneratedTestCodeArtifactSchema),
+  pageObjects: z.array(PageObjectResponseSchema),
+  fixtures: PlaywrightFixtureResponseSchema,
+  config: PlaywrightConfigResponseSchema,
+  totalFiles: z.number().int().nonnegative(),
+});
+export type TestSuiteBundleResponse = z.infer<typeof TestSuiteBundleResponseSchema>;
+
+

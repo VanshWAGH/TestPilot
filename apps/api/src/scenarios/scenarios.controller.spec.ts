@@ -21,6 +21,9 @@ describe("ScenariosController", () => {
       getPageObject: vi.fn().mockResolvedValue({ className: "LoginPage", code: "export class LoginPage {}" }),
       listTestFiles: vi.fn().mockResolvedValue([{ id: "tf-1", filePath: "tests/s1.spec.ts" }]),
       getTestFile: vi.fn().mockResolvedValue({ id: "tf-1", filePath: "tests/s1.spec.ts" }),
+      generateFixtures: vi.fn().mockResolvedValue({ fixtureFilePath: "fixtures/index.ts" }),
+      generatePlaywrightConfig: vi.fn().mockResolvedValue({ filePath: "playwright.config.ts" }),
+      getFullSuiteArtifacts: vi.fn().mockResolvedValue({ totalFiles: 5 }),
     };
 
     controller = new ScenariosController(mockScenariosService);
@@ -136,6 +139,32 @@ describe("ScenariosController", () => {
     const res = await controller.getTestFile("proj-1", "tf-1");
     expect(res).toEqual({ id: "tf-1", filePath: "tests/s1.spec.ts" });
     expect(mockScenariosService.getTestFile).toHaveBeenCalledWith("proj-1", "tf-1");
+  });
+
+  it("getFixtures calls service", async () => {
+    const res = await controller.getFixtures("proj-1");
+    expect(res).toEqual({ fixtureFilePath: "fixtures/index.ts" });
+    expect(mockScenariosService.generateFixtures).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("getPlaywrightConfig calls service", async () => {
+    const res = await controller.getPlaywrightConfig("proj-1");
+    expect(res).toEqual({ filePath: "playwright.config.ts" });
+    expect(mockScenariosService.generatePlaywrightConfig).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("customizePlaywrightConfig calls service with options", async () => {
+    const res = await controller.customizePlaywrightConfig("proj-1", { timeout: 45000 });
+    expect(res).toEqual({ filePath: "playwright.config.ts" });
+    expect(mockScenariosService.generatePlaywrightConfig).toHaveBeenCalledWith("proj-1", {
+      timeout: 45000,
+    });
+  });
+
+  it("getSuiteBundle calls service", async () => {
+    const res = await controller.getSuiteBundle("proj-1");
+    expect(res).toEqual({ totalFiles: 5 });
+    expect(mockScenariosService.getFullSuiteArtifacts).toHaveBeenCalledWith("proj-1");
   });
 });
 

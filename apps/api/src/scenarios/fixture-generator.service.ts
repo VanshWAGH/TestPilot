@@ -1,0 +1,366 @@
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { PageModelService } from "./page-model.service";
+import { PageObjectGeneratorService } from "./page-object-generator.service";
+import type { PlaywrightFixtureResponse } from "@testpilot/shared";
+import * as ts from "typescript";
+
+@Injectable()
+export class FixtureGeneratorService {
+  private readonly logger = new Logger(FixtureGeneratorService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pageModelService: PageModelService,
+    private readonly pageObjectGenerator: PageObjectGeneratorService,
+  ) {}
+
+  /**
+   * Generates Playwright test fixtures (fixtures/index.ts) and optional auth setup (tests/auth.setup.ts)
+   * for all pages and credentials configured in the project.
+   */
+  async generateFixtures(projectId: string): Promise<PlaywrightFixtureResponse> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        pages: true,
+        environments: {
+          include: {
+            credentials: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project ${projectId} not found`);
+    }
+
+    // 1. Generate or retrieve page objects for all project pages
+    const pageObjects: Array<{
+      className: string;
+      fileName: string;
+      filePath: string;
+      fixtureName: string;
+    }> = [];
+
+    const usedFixtureNames = new Set<string>();
+
+    for (const page of project.pages) {
+      try {
+        const pageModel = await this.pageModelService.assemblePageModel(
+          projectId,
+          page.id,
+        );
+        const po = this.pageObjectGenerator.generatePageObject(pageModel);
+
+        let fixtureName = this.toCamelCase(po.className);
+        if (usedFixtureNames.has(fixtureName)) {
+          fixtureName = `${fixtureName}_${page.id.slice(0, 4)}`;
+        }
+        usedFixtureNames.add(fixtureName);
+
+        pageObjects.push({
+          className: po.className,
+          fileName: po.fileName,
+          filePath: po.filePath,
+          fixtureName,
+        });
+      } catch (err: any) {
+        this.logger.warn(
+          `Could not generate page object for page ${page.id}: ${err.message}`,
+        );
+      }
+    }
+
+    // 2. Determine auth details
+    const defaultEnv =
+      project.environments.find((e) => e.isDefault) || project.environments[0];
+    const hasCredentials = Boolean(
+      defaultEnv?.credentials?.usernameEncrypted ||
+        defaultEnv?.credentials?.loginUrl,
+    );
+    const loginUrl = defaultEnv?.credentials?.loginUrl || "/login";
+
+    // 3. Assemble fixtures/index.ts
+    const fixtureContent = this.assembleFixturesFile(
+      project.name,
+      pageObjects,
+      hasCredentials,
+    );
+
+    // 4. Assemble optional auth.setup.ts
+    let authSetupContent: string | undefined = undefined;
+    let authSetupFilePath: string | undefined = undefined;
+
+    if (hasCredentials || project.environments.length > 0) {
+      authSetupFilePath = "tests/auth.setup.ts";
+      authSetupContent = this.assembleAuthSetupFile(project.name, loginUrl);
+    }
+
+    // 5. TypeScript syntax verification
+    const { isValid: isFixtureValid, errors: fixtureErrors } =
+      this.verifyTypeScript(fixtureContent, "fixtures/index.ts");
+
+    let authErrors: string[] = [];
+    if (authSetupContent && authSetupFilePath) {
+      const authCheck = this.verifyTypeScript(
+        authSetupContent,
+        authSetupFilePath,
+      );
+      if (!authCheck.isValid) {
+        authErrors = authCheck.errors;
+      }
+    }
+
+    const compilationErrors = [...fixtureErrors, ...authErrors];
+    const compilationStatus =
+      compilationErrors.length === 0 ? "valid" : "invalid";
+
+    this.logger.log(
+      `Generated Playwright fixtures for project "${project.name}" (PageObjects: ${pageObjects.length}, Auth: ${hasCredentials}, Valid: ${compilationStatus === "valid"})`,
+    );
+
+    return {
+      projectId,
+      fixtureFilePath: "fixtures/index.ts",
+      fixtureContent,
+      authSetupFilePath,
+      authSetupContent,
+      pageObjectsIncluded: pageObjects.map((po) => po.className),
+      hasAuthFixture: true,
+      hasTestDataFixture: true,
+      compilationStatus,
+      compilationErrors,
+    };
+  }
+
+  // ─── Code Assembly ──────────────────────────────────────────────────────────
+
+  private assembleFixturesFile(
+    projectName: string,
+    pageObjects: Array<{
+      className: string;
+      fileName: string;
+      fixtureName: string;
+    }>,
+    hasCredentials: boolean,
+  ): string {
+    const lines: string[] = [];
+
+    lines.push(`/**`);
+    lines.push(` * TestPilot Custom Playwright Fixtures`);
+    lines.push(` * Project: ${projectName}`);
+    lines.push(` * Auto-generated by TestPilot Engine`);
+    lines.push(` */`);
+    lines.push("");
+    lines.push(`import { test as base, expect, Page, APIRequestContext } from '@playwright/test';`);
+
+    if (pageObjects.length > 0) {
+      lines.push("");
+      lines.push("// ─── Page Object Imports ───────────────────────────────────────────────────");
+      for (const po of pageObjects) {
+        const importPath = `../pages/${po.fileName.replace(/\.ts$/, "")}`;
+        lines.push(`import { ${po.className} } from '${importPath}';`);
+      }
+    }
+
+    lines.push("");
+    lines.push("// ─── Extended Fixture Types ────────────────────────────────────────────────");
+    lines.push("export type TestFixtures = {");
+
+    // Page object types
+    for (const po of pageObjects) {
+      lines.push(`  ${po.fixtureName}: ${po.className};`);
+    }
+
+    // Helper fixtures
+    lines.push("  authenticatedPage: Page;");
+    lines.push("  testData: Record<string, any>;");
+    lines.push("  testSessionId: string;");
+    lines.push("  apiClient: APIRequestContext;");
+    lines.push("};");
+    lines.push("");
+
+    lines.push("// ─── Fixture Implementations ───────────────────────────────────────────────");
+    lines.push("export const test = base.extend<TestFixtures>({");
+
+    // Page Object instantiations
+    for (const po of pageObjects) {
+      lines.push(`  ${po.fixtureName}: async ({ page }, use) => {`);
+      lines.push(`    const instance = new ${po.className}(page);`);
+      lines.push(`    await use(instance);`);
+      lines.push(`  },`);
+      lines.push("");
+    }
+
+    // Test data fixture with setup & teardown lifecycle
+    lines.push("  // Dynamically generated test data with seed generator & cleanup");
+    lines.push("  testData: async ({}, use) => {");
+    lines.push("    const uniqueSuffix = Math.random().toString(36).substring(2, 9);");
+    lines.push("    const seedData = {");
+    lines.push("      sessionId: `tp-${Date.now()}-${uniqueSuffix}`,");
+    lines.push("      timestamp: new Date().toISOString(),");
+    lines.push("      user: {");
+    lines.push("        username: `testuser_${uniqueSuffix}`,");
+    lines.push("        email: `testpilot_${uniqueSuffix}@example.com`,");
+    lines.push("        firstName: 'Test',");
+    lines.push("        lastName: 'Pilot',");
+    lines.push("        postalCode: '90210',");
+    lines.push("      },");
+    lines.push("    };");
+    lines.push("");
+    lines.push("    // Provide fixture data to test");
+    lines.push("    await use(seedData);");
+    lines.push("");
+    lines.push("    // Teardown / cleanup hook executed after test completes");
+    lines.push("    // (e.g. database purge, test entity deletion)");
+    lines.push("  },");
+    lines.push("");
+
+    // Test session id fixture
+    lines.push("  testSessionId: async ({}, use) => {");
+    lines.push("    await use(`test-session-${Date.now()}`);");
+    lines.push("  },");
+    lines.push("");
+
+    // Authenticated page fixture
+    lines.push("  // Authenticated page using storage state from auth setup or fallback context");
+    lines.push("  authenticatedPage: async ({ browser }, use) => {");
+    lines.push("    const storagePath = 'playwright/.auth/user.json';");
+    lines.push("    let context;");
+    lines.push("    try {");
+    lines.push("      context = await browser.newContext({ storageState: storagePath });");
+    lines.push("    } catch {");
+    lines.push("      // Fallback to fresh context if auth storage state file is not generated yet");
+    lines.push("      context = await browser.newContext();");
+    lines.push("    }");
+    lines.push("    const page = await context.newPage();");
+    lines.push("    await use(page);");
+    lines.push("    await context.close();");
+    lines.push("  },");
+    lines.push("");
+
+    // API client fixture
+    lines.push("  // API client with baseURL and custom request headers");
+    lines.push("  apiClient: async ({ playwright, baseURL }, use) => {");
+    lines.push("    const api = await playwright.request.newContext({");
+    lines.push("      baseURL,");
+    lines.push("      extraHTTPHeaders: {");
+    lines.push("        'Accept': 'application/json',");
+    lines.push("        'X-Test-Runner': 'TestPilot-Engine',");
+    lines.push("      },");
+    lines.push("    });");
+    lines.push("    await use(api);");
+    lines.push("    await api.dispose();");
+    lines.push("  },");
+
+    lines.push("});");
+    lines.push("");
+    lines.push("export { expect };");
+    lines.push("");
+
+    return lines.join("\n");
+  }
+
+  private assembleAuthSetupFile(projectName: string, loginUrl: string): string {
+    const lines: string[] = [];
+
+    lines.push(`/**`);
+    lines.push(` * TestPilot Playwright Authentication Setup`);
+    lines.push(` * Project: ${projectName}`);
+    lines.push(` * Executes prior to test suite to cache auth cookies and local storage`);
+    lines.push(` */`);
+    lines.push("");
+    lines.push(`import { test as setup, expect } from '@playwright/test';`);
+    lines.push("");
+    lines.push(`const authFile = 'playwright/.auth/user.json';`);
+    lines.push("");
+    lines.push(`setup('authenticate session', async ({ page }) => {`);
+    lines.push(`  const loginPath = process.env.LOGIN_URL || '${this.escapeQuotes(loginUrl)}';`);
+    lines.push(`  const username = process.env.TEST_USERNAME || 'standard_user';`);
+    lines.push(`  const password = process.env.TEST_PASSWORD || 'secret_sauce';`);
+    lines.push("");
+    lines.push(`  await page.goto(loginPath);`);
+    lines.push("");
+    lines.push(`  // Fill credentials if input fields exist`);
+    lines.push(`  const userInput = page.locator('input[type="text"], input[name*="user" i], [data-test="username"]').first();`);
+    lines.push(`  const passInput = page.locator('input[type="password"], input[name*="pass" i], [data-test="password"]').first();`);
+    lines.push(`  const submitBtn = page.locator('button[type="submit"], input[type="submit"], [data-test="login-button"]').first();`);
+    lines.push("");
+    lines.push(`  if (await userInput.isVisible({ timeout: 5000 }).catch(() => false)) {`);
+    lines.push(`    await userInput.fill(username);`);
+    lines.push(`    await passInput.fill(password);`);
+    lines.push(`    await submitBtn.click();`);
+    lines.push(`    await page.waitForLoadState('networkidle');`);
+    lines.push(`  }`);
+    lines.push("");
+    lines.push(`  // Save browser storage state to auth file for dependent projects`);
+    lines.push(`  await page.context().storageState({ path: authFile });`);
+    lines.push(`});`);
+    lines.push("");
+
+    return lines.join("\n");
+  }
+
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  private toCamelCase(str: string): string {
+    if (!str) return "pageObject";
+
+    // If it's already a single identifier (e.g. LoginPage, InventoryPage)
+    if (/^[A-Za-z0-9]+$/.test(str)) {
+      return str.charAt(0).toLowerCase() + str.slice(1);
+    }
+
+    const words = str
+      .replace(/[^a-zA-Z0-9]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (words.length === 0) return "pageObject";
+
+    return (
+      words[0].toLowerCase() +
+      words
+        .slice(1)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join("")
+    );
+  }
+
+  private escapeQuotes(str: string): string {
+    return (str || "").replace(/'/g, "\\'");
+  }
+
+  private verifyTypeScript(
+    code: string,
+    fileName: string,
+  ): { isValid: boolean; errors: string[] } {
+    const result = ts.transpileModule(code, {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+        strict: false,
+      },
+      fileName,
+      reportDiagnostics: true,
+    });
+
+    const errors: string[] = [];
+    if (result.diagnostics && result.diagnostics.length > 0) {
+      for (const diag of result.diagnostics) {
+        if (diag.category === ts.DiagnosticCategory.Error) {
+          const msg = ts.flattenDiagnosticMessageText(diag.messageText, "\n");
+          errors.push(msg);
+        }
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+}

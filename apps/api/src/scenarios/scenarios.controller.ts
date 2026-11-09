@@ -23,6 +23,7 @@ import {
 import { ScenariosService } from "./scenarios.service";
 import { GenerateScenariosDto } from "./dto/generate-scenarios.dto";
 import { GenerateCodeDto } from "./dto/generate-code.dto";
+import { GeneratePlaywrightConfigDto } from "./dto/generate-config.dto";
 import { ScenarioQueryDto } from "./dto/scenario-query.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { BatchApproveScenariosDto } from "./dto/batch-approve-scenarios.dto";
@@ -279,5 +280,71 @@ export class ScenariosController {
     @Param("testFileId", ParseUUIDPipe) testFileId: string,
   ): Promise<any> {
     return await this.scenariosService.getTestFile(projectId, testFileId);
+  }
+
+  // ─── GET /projects/:projectId/fixtures ──────────────────────────────────────
+
+  @Get("projects/:projectId/fixtures")
+  @ApiOperation({
+    summary: "Generate or retrieve Playwright fixtures (Task 2.8)",
+    description:
+      "Generates fixtures/index.ts with Page Objects, auth state, and dynamic test data lifecycle fixtures.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Generated Playwright fixtures artifact" })
+  async getFixtures(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ): Promise<any> {
+    return await this.scenariosService.generateFixtures(projectId);
+  }
+
+  // ─── GET /projects/:projectId/playwright-config ─────────────────────────────
+
+  @Get("projects/:projectId/playwright-config")
+  @ApiOperation({
+    summary: "Generate or retrieve Playwright config (Task 2.9)",
+    description:
+      "Generates playwright.config.ts configured with project environment base URL, multi-browser matrix, and reporting.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Generated Playwright configuration artifact" })
+  async getPlaywrightConfig(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ): Promise<any> {
+    return await this.scenariosService.generatePlaywrightConfig(projectId);
+  }
+
+  // ─── POST /projects/:projectId/playwright-config ────────────────────────────
+
+  @Post("projects/:projectId/playwright-config")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Generate Playwright config with custom options",
+    description:
+      "Generates playwright.config.ts with custom timeouts, browser matrix, or trace options.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Generated Playwright configuration artifact" })
+  async customizePlaywrightConfig(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: GeneratePlaywrightConfigDto,
+  ): Promise<any> {
+    return await this.scenariosService.generatePlaywrightConfig(projectId, dto);
+  }
+
+  // ─── GET /projects/:projectId/suite-bundle ──────────────────────────────────
+
+  @Get("projects/:projectId/suite-bundle")
+  @ApiOperation({
+    summary: "Get complete test suite bundle",
+    description:
+      "Returns all test files, page objects, fixtures, and playwright.config.ts in a single unified bundle.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Complete test suite bundle" })
+  async getSuiteBundle(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ): Promise<any> {
+    return await this.scenariosService.getFullSuiteArtifacts(projectId);
   }
 }

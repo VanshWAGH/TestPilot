@@ -9,9 +9,14 @@ describe("ScenariosService", () => {
   let mockGeneratorService: any;
   let mockPageObjectGenerator: any;
   let mockTestCodeGenerator: any;
+  let mockFixtureGenerator: any;
+  let mockConfigGenerator: any;
 
   beforeEach(() => {
     mockPrisma = {
+      project: {
+        findUnique: vi.fn(),
+      },
       scenario: {
         findMany: vi.fn(),
         findFirst: vi.fn(),
@@ -44,12 +49,41 @@ describe("ScenariosService", () => {
       generateTestsForProject: vi.fn().mockResolvedValue([{ testFilePath: "tests/inventory.spec.ts" }]),
     };
 
+    mockFixtureGenerator = {
+      generateFixtures: vi.fn().mockResolvedValue({
+        projectId: "proj-1",
+        fixtureFilePath: "fixtures/index.ts",
+        fixtureContent: "// fixtures",
+        pageObjectsIncluded: ["InventoryPage"],
+        hasAuthFixture: true,
+        hasTestDataFixture: true,
+        compilationStatus: "valid",
+        compilationErrors: [],
+      }),
+    };
+
+    mockConfigGenerator = {
+      generateConfig: vi.fn().mockResolvedValue({
+        projectId: "proj-1",
+        filePath: "playwright.config.ts",
+        content: "// config",
+        baseUrl: "https://www.saucedemo.com",
+        projects: ["chromium", "firefox", "webkit"],
+        reporters: ["html", "json", "list"],
+        hasAuthSetup: true,
+        compilationStatus: "valid",
+        compilationErrors: [],
+      }),
+    };
+
     service = new ScenariosService(
       mockPrisma,
       mockPageModelService,
       mockGeneratorService,
       mockPageObjectGenerator,
       mockTestCodeGenerator,
+      mockFixtureGenerator,
+      mockConfigGenerator,
     );
   });
 
@@ -235,6 +269,48 @@ describe("ScenariosService", () => {
     it("getTestFile throws NotFoundException when not found", async () => {
       mockPrisma.testFile.findFirst.mockResolvedValue(null);
       await expect(service.getTestFile("proj-1", "missing")).rejects.toThrow(NotFoundException);
+    });
+
+    it("delegates generateFixtures to FixtureGeneratorService", async () => {
+      const res = await service.generateFixtures("proj-1");
+      expect(res.fixtureFilePath).toBe("fixtures/index.ts");
+      expect(mockFixtureGenerator.generateFixtures).toHaveBeenCalledWith("proj-1");
+    });
+
+    it("delegates generatePlaywrightConfig to PlaywrightConfigGeneratorService", async () => {
+      const res = await service.generatePlaywrightConfig("proj-1", { timeout: 40000 });
+      expect(res.filePath).toBe("playwright.config.ts");
+      expect(mockConfigGenerator.generateConfig).toHaveBeenCalledWith("proj-1", { timeout: 40000 });
+    });
+
+    it("getFullSuiteArtifacts bundles testFiles, pageObjects, fixtures, and config", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: "proj-1",
+        name: "SauceDemo",
+        pages: [{ id: "p1" }],
+      });
+      mockPrisma.testFile.findMany.mockResolvedValue([
+        {
+          id: "tf-1",
+          scenarioId: "sc-1",
+          filePath: "tests/inventory.spec.ts",
+          content: "test('works')",
+          pageObjectPath: "pages/inventory.page.ts",
+          pageObjectContent: "class InventoryPage {}",
+          fileContentHash: "hash123",
+          createdAt: new Date(),
+          scenario: { title: "Login and check inventory" },
+        },
+      ]);
+
+      const bundle = await service.getFullSuiteArtifacts("proj-1");
+      expect(bundle.projectId).toBe("proj-1");
+      expect(bundle.projectName).toBe("SauceDemo");
+      expect(bundle.testFiles).toHaveLength(1);
+      expect(bundle.pageObjects).toHaveLength(1);
+      expect(bundle.fixtures.fixtureFilePath).toBe("fixtures/index.ts");
+      expect(bundle.config.filePath).toBe("playwright.config.ts");
+      expect(bundle.totalFiles).toBeGreaterThanOrEqual(4);
     });
   });
 });
