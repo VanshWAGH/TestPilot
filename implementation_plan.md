@@ -248,8 +248,8 @@ testpilot/
 | 2.3 | **Scenario generation (LLM Pass 1)** | Feed Page Model to LLM. Output: structured scenarios as JSON array. Each scenario: title, type (smoke/functional/visual/etc.), preconditions, steps (action + locator + data), assertions, risk level, required test data. | ✅ **Completed** (LLM Pass 1 scenario generation via `ScenarioGeneratorService`, persisted into Postgres DB with title, type, riskLevel, steps, assertions, testData, full query/update/batch approval APIs via `ScenariosController`) |
 | 2.4 | **Scenario review UI** | Table view of generated scenarios. Each row: title, type badge, risk badge, step count. Expand to see full steps + assertions. Actions: approve ✅, reject ❌, edit ✏️. Batch approve. | ✅ **Completed** (Rich table view with expand/collapse steps & assertions, multi-select batch approval/rejection toolbar, search & type/risk/status filters, generator dialog at `/scenarios`) |
 | 2.5 | **Scenario editing** | Inline editing of scenario steps, assertions, test data. Add/remove steps. Change locators. | ✅ **Completed** (Interactive `ScenarioEditDialog` with step adding/removal, action selectors, locator editing, assertion configurations, and test data JSON validation with live optimistic updates) |
-| 2.6 | **Test code generation (LLM Pass 2)** | Take approved scenarios + deterministic templates → generate Playwright test files. TypeScript compilation check. Page Object pattern. | `.spec.ts` files generated |
-| 2.7 | **Page Object generation** | Generate page object classes from Page Model. Encapsulate locators, actions, assertions. | `.page.ts` files generated |
+| 2.6 | **Test code generation (LLM Pass 2)** | Take approved scenarios + deterministic templates → generate Playwright test files. TypeScript compilation check. Page Object pattern. | ✅ **Completed** (Playwright test code generation via `TestCodeGeneratorService` using LLM Pass 2 with OpenRouter fallback cascade, deterministic templates, TypeScript compiler validation check, SHA-256 hashing, and DB persistence) |
+| 2.7 | **Page Object generation** | Generate page object classes from Page Model. Encapsulate locators, actions, assertions. | ✅ **Completed** (Page Object generator via `PageObjectGeneratorService` creating typed Playwright classes with locator ladder, action helpers, assertion methods, and TS transpiler syntax verification) |
 | 2.8 | **Fixture generation** | Generate Playwright fixtures for auth state, test data setup/teardown. | `fixtures.ts` generated |
 | 2.9 | **Playwright config generation** | Generate `playwright.config.ts` with project configs, reporter settings, base URL from environment. | Config file generated |
 | 2.10 | **Code preview UI** | Syntax-highlighted code preview (Shiki) for generated test files, page objects, fixtures, config. Side-by-side: scenario ↔ code. | Code viewable in UI |
@@ -262,7 +262,7 @@ testpilot/
 #### Definition of Done
 - [ ] LLM generates 10–15 scenarios for SauceDemo
 - [x] Scenarios reviewable/editable in UI
-- [ ] Approved scenarios produce valid Playwright TypeScript code
+- [x] Approved scenarios produce valid Playwright TypeScript code
 - [ ] Code committed to GitHub repo via PR
 - [ ] Code compiles and tests are discoverable
 

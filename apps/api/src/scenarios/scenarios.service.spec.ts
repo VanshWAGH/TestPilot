@@ -7,6 +7,8 @@ describe("ScenariosService", () => {
   let mockPrisma: any;
   let mockPageModelService: any;
   let mockGeneratorService: any;
+  let mockPageObjectGenerator: any;
+  let mockTestCodeGenerator: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -16,6 +18,10 @@ describe("ScenariosService", () => {
         update: vi.fn(),
         updateMany: vi.fn(),
         delete: vi.fn(),
+      },
+      testFile: {
+        findMany: vi.fn(),
+        findFirst: vi.fn(),
       },
     };
 
@@ -29,10 +35,21 @@ describe("ScenariosService", () => {
       generateScenariosForProject: vi.fn().mockResolvedValue([{ pageId: "p1", scenarioCount: 1 }]),
     };
 
+    mockPageObjectGenerator = {
+      generatePageObject: vi.fn().mockReturnValue({ className: "InventoryPage", filePath: "pages/inventory.page.ts" }),
+    };
+
+    mockTestCodeGenerator = {
+      generateTestForScenario: vi.fn().mockResolvedValue({ testFilePath: "tests/inventory.spec.ts" }),
+      generateTestsForProject: vi.fn().mockResolvedValue([{ testFilePath: "tests/inventory.spec.ts" }]),
+    };
+
     service = new ScenariosService(
       mockPrisma,
       mockPageModelService,
       mockGeneratorService,
+      mockPageObjectGenerator,
+      mockTestCodeGenerator,
     );
   });
 
@@ -178,5 +195,46 @@ describe("ScenariosService", () => {
       });
     });
   });
-});
 
+  describe("Test Code & Page Object methods (Tasks 2.6 & 2.7)", () => {
+    it("delegates generateTestCode to TestCodeGeneratorService", async () => {
+      const res = await service.generateTestCode("proj-1", "sc-1");
+      expect(res).toEqual({ testFilePath: "tests/inventory.spec.ts" });
+      expect(mockTestCodeGenerator.generateTestForScenario).toHaveBeenCalledWith("proj-1", "sc-1", undefined);
+    });
+
+    it("delegates generateBatchTestCode to TestCodeGeneratorService", async () => {
+      const res = await service.generateBatchTestCode("proj-1", { onlyApproved: true });
+      expect(res).toHaveLength(1);
+      expect(mockTestCodeGenerator.generateTestsForProject).toHaveBeenCalledWith("proj-1", {
+        scenarioIds: undefined,
+        onlyApproved: true,
+        model: undefined,
+      });
+    });
+
+    it("delegates getPageObject to PageObjectGeneratorService", async () => {
+      const res = await service.getPageObject("proj-1", "p1");
+      expect(res.className).toBe("InventoryPage");
+      expect(mockPageObjectGenerator.generatePageObject).toHaveBeenCalled();
+    });
+
+    it("listTestFiles queries Prisma with project filter", async () => {
+      mockPrisma.testFile.findMany.mockResolvedValue([{ id: "tf-1" }]);
+      const res = await service.listTestFiles("proj-1");
+      expect(res).toHaveLength(1);
+      expect(mockPrisma.testFile.findMany).toHaveBeenCalled();
+    });
+
+    it("getTestFile returns file when found", async () => {
+      mockPrisma.testFile.findFirst.mockResolvedValue({ id: "tf-1" });
+      const res = await service.getTestFile("proj-1", "tf-1");
+      expect(res.id).toBe("tf-1");
+    });
+
+    it("getTestFile throws NotFoundException when not found", async () => {
+      mockPrisma.testFile.findFirst.mockResolvedValue(null);
+      await expect(service.getTestFile("proj-1", "missing")).rejects.toThrow(NotFoundException);
+    });
+  });
+});

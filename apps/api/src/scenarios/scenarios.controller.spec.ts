@@ -16,6 +16,11 @@ describe("ScenariosController", () => {
       updateScenario: vi.fn().mockResolvedValue({ id: "sc-1", title: "Updated" }),
       deleteScenario: vi.fn().mockResolvedValue({ success: true }),
       batchApprove: vi.fn().mockResolvedValue({ affectedCount: 2, status: "approved" }),
+      generateTestCode: vi.fn().mockResolvedValue({ testFileId: "tf-1", specFilePath: "tests/s1.spec.ts" }),
+      generateBatchTestCode: vi.fn().mockResolvedValue([{ testFileId: "tf-1" }]),
+      getPageObject: vi.fn().mockResolvedValue({ className: "LoginPage", code: "export class LoginPage {}" }),
+      listTestFiles: vi.fn().mockResolvedValue([{ id: "tf-1", filePath: "tests/s1.spec.ts" }]),
+      getTestFile: vi.fn().mockResolvedValue({ id: "tf-1", filePath: "tests/s1.spec.ts" }),
     };
 
     controller = new ScenariosController(mockScenariosService);
@@ -93,6 +98,44 @@ describe("ScenariosController", () => {
       { scenarioIds: ["s1", "s2"], action: "approve" },
       "clerk-user-123",
     );
+  });
+
+  it("generateCodeForScenario calls service", async () => {
+    const res = await controller.generateCodeForScenario("proj-1", "sc-1", {
+      model: "openrouter/free",
+    });
+    expect(res).toEqual({ testFileId: "tf-1", specFilePath: "tests/s1.spec.ts" });
+    expect(mockScenariosService.generateTestCode).toHaveBeenCalledWith("proj-1", "sc-1", {
+      model: "openrouter/free",
+    });
+  });
+
+  it("generateBatchCode calls service", async () => {
+    const res = await controller.generateBatchCode("proj-1", {
+      onlyApproved: true,
+    });
+    expect(res).toEqual([{ testFileId: "tf-1" }]);
+    expect(mockScenariosService.generateBatchTestCode).toHaveBeenCalledWith("proj-1", {
+      onlyApproved: true,
+    });
+  });
+
+  it("getPageObject calls service", async () => {
+    const res = await controller.getPageObject("proj-1", "p1");
+    expect(res).toEqual({ className: "LoginPage", code: "export class LoginPage {}" });
+    expect(mockScenariosService.getPageObject).toHaveBeenCalledWith("proj-1", "p1");
+  });
+
+  it("listTestFiles calls service", async () => {
+    const res = await controller.listTestFiles("proj-1");
+    expect(res).toEqual([{ id: "tf-1", filePath: "tests/s1.spec.ts" }]);
+    expect(mockScenariosService.listTestFiles).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("getTestFile calls service", async () => {
+    const res = await controller.getTestFile("proj-1", "tf-1");
+    expect(res).toEqual({ id: "tf-1", filePath: "tests/s1.spec.ts" });
+    expect(mockScenariosService.getTestFile).toHaveBeenCalledWith("proj-1", "tf-1");
   });
 });
 

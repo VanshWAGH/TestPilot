@@ -2,7 +2,10 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { PageModelService } from "./page-model.service";
 import { ScenarioGeneratorService } from "./scenario-generator.service";
+import { PageObjectGeneratorService } from "./page-object-generator.service";
+import { TestCodeGeneratorService } from "./test-code-generator.service";
 import { GenerateScenariosDto } from "./dto/generate-scenarios.dto";
+import { GenerateCodeDto } from "./dto/generate-code.dto";
 import { ScenarioQueryDto } from "./dto/scenario-query.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { BatchApproveScenariosDto } from "./dto/batch-approve-scenarios.dto";
@@ -16,6 +19,8 @@ export class ScenariosService {
     private readonly prisma: PrismaService,
     private readonly pageModelService: PageModelService,
     private readonly generatorService: ScenarioGeneratorService,
+    private readonly pageObjectGenerator: PageObjectGeneratorService,
+    private readonly testCodeGenerator: TestCodeGeneratorService,
   ) {}
 
   // ─── Page & Project Models ──────────────────────────────────────────────────
@@ -195,5 +200,92 @@ export class ScenariosService {
       status: newStatus,
       scenarioIds: dto.scenarioIds,
     };
+  }
+
+  // ─── Test Code & Page Object Generation (Tasks 2.6 & 2.7) ─────────────────
+
+  async generateTestCode(
+    projectId: string,
+    scenarioId: string,
+    options?: { model?: string },
+  ) {
+    return await this.testCodeGenerator.generateTestForScenario(
+      projectId,
+      scenarioId,
+      options,
+    );
+  }
+
+  async generateBatchTestCode(projectId: string, dto: GenerateCodeDto) {
+    return await this.testCodeGenerator.generateTestsForProject(projectId, {
+      scenarioIds: dto.scenarioIds,
+      onlyApproved: dto.onlyApproved ?? true,
+      model: dto.model,
+    });
+  }
+
+  async getPageObject(projectId: string, pageId: string) {
+    const pageModel = await this.pageModelService.assemblePageModel(
+      projectId,
+      pageId,
+    );
+    return this.pageObjectGenerator.generatePageObject(pageModel);
+  }
+
+  async listTestFiles(projectId: string) {
+    return await this.prisma.testFile.findMany({
+      where: {
+        scenario: {
+          projectId,
+        },
+      },
+      include: {
+        scenario: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            riskLevel: true,
+            status: true,
+            pageId: true,
+            page: {
+              select: {
+                id: true,
+                url: true,
+                route: true,
+                title: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async getTestFile(projectId: string, testFileId: string) {
+    const testFile = await this.prisma.testFile.findFirst({
+      where: {
+        id: testFileId,
+        scenario: {
+          projectId,
+        },
+      },
+      include: {
+        scenario: {
+          include: {
+            page: true,
+          },
+        },
+      },
+    });
+
+    if (!testFile) {
+      throw new NotFoundException(
+        `Test file ${testFileId} not found in project ${projectId}`,
+      );
+    }
+
+    return testFile;
   }
 }

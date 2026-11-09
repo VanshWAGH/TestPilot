@@ -98,3 +98,29 @@ export const CommitTestsRequestSchema = z.object({
   createPullRequest: z.boolean().default(true),
 });
 export type CommitTestsRequest = z.infer<typeof CommitTestsRequestSchema>;
+
+export const PageObjectResponseSchema = z.object({
+  pageId: z.string(),
+  className: z.string(),
+  filePath: z.string(),
+  content: z.string(),
+  locatorsCount: z.number().int().nonnegative(),
+  methodsCount: z.number().int().nonnegative(),
+});
+export type PageObjectResponse = z.infer<typeof PageObjectResponseSchema>;
+
+export const GeneratedTestCodeArtifactSchema = z.object({
+  id: z.string(),
+  scenarioId: z.string(),
+  scenarioTitle: z.string(),
+  testFilePath: z.string(),
+  testContent: z.string(),
+  pageObjectPath: z.string().nullable().optional(),
+  pageObjectContent: z.string().nullable().optional(),
+  compilationStatus: z.enum(["valid", "invalid"]),
+  compilationErrors: z.array(z.string()).default([]),
+  fileContentHash: z.string(),
+  createdAt: z.string().datetime(),
+});
+export type GeneratedTestCodeArtifact = z.infer<typeof GeneratedTestCodeArtifactSchema>;
+
