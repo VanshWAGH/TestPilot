@@ -13,6 +13,7 @@ import { CommitTestsDto } from "./dto/commit-tests.dto";
 import type {
   CommitTestsResult,
   CommitHistoryItem,
+  RepoStatusResponse,
 } from "@testpilot/shared";
 
 @Injectable()
@@ -460,6 +461,147 @@ export class GitCommitService {
       committedAt: tf.committedAt ? tf.committedAt.toISOString() : null,
       createdAt: tf.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * Retrieves comprehensive repository, branch, Pull Request, and test file status (Task 2.13).
+   */
+  async getRepoStatus(projectId: string): Promise<RepoStatusResponse> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        pages: true,
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project ${projectId} not found`);
+    }
+
+    const baseBranch = project.githubBranch || "main";
+
+    if (!project.githubTestRepo) {
+      return {
+        projectId,
+        projectName: project.name,
+        isConfigured: false,
+        connectedRepo: null,
+        repoUrl: null,
+        baseBranch,
+        currentBranch: null,
+        latestCommitSha: null,
+        latestCommitDate: null,
+        openPullRequest: null,
+        fileStats: {
+          totalSpecs: 0,
+          totalPageObjects: project.pages.length,
+          hasFixtures: true,
+          hasConfig: true,
+          totalFiles: 0,
+        },
+      };
+    }
+
+    const [owner, repo] = project.githubTestRepo.split("/");
+    const repoUrl = `https://github.com/${owner}/${repo}`;
+
+    const latestCommittedFile = await this.prisma.testFile.findFirst({
+      where: {
+        scenario: { projectId },
+        githubCommitSha: { not: null },
+      },
+      orderBy: { committedAt: "desc" },
+    });
+
+    const currentBranch =
+      latestCommittedFile?.githubBranch || "generated/initial-tests";
+
+    const totalSpecs = await this.prisma.testFile.count({
+      where: { scenario: { projectId } },
+    });
+
+    let openPullRequest: any = null;
+
+    try {
+      const octokit = this.getOctokitClient(project.githubInstallationId);
+      const { data: prs } = await octokit.pulls.list({
+        owner,
+        repo,
+        head: `${owner}:${currentBranch}`,
+        base: baseBranch,
+        state: "open",
+      });
+
+      if (prs && prs.length > 0) {
+        const pr = prs[0];
+        openPullRequest = {
+          number: pr.number,
+          title: pr.title,
+          state: pr.state,
+          htmlUrl: pr.html_url,
+          branch: currentBranch,
+          baseBranch,
+          createdAt: pr.created_at,
+          updatedAt: pr.updated_at,
+        };
+      } else if (
+        latestCommittedFile?.githubPrNumber &&
+        latestCommittedFile?.githubPrUrl
+      ) {
+        openPullRequest = {
+          number: latestCommittedFile.githubPrNumber,
+          title: "🧪 Automated Playwright Test Suite",
+          state: "open",
+          htmlUrl: latestCommittedFile.githubPrUrl,
+          branch: currentBranch,
+          baseBranch,
+        };
+      }
+    } catch (err: any) {
+      this.logger.debug(
+        `Failed to fetch open PRs from GitHub: ${err.message}`,
+      );
+      if (
+        latestCommittedFile?.githubPrNumber &&
+        latestCommittedFile?.githubPrUrl
+      ) {
+        openPullRequest = {
+          number: latestCommittedFile.githubPrNumber,
+          title: "🧪 Automated Playwright Test Suite",
+          state: "open",
+          htmlUrl: latestCommittedFile.githubPrUrl,
+          branch: currentBranch,
+          baseBranch,
+        };
+      }
+    }
+
+    const totalFiles =
+      totalSpecs +
+      project.pages.length +
+      2; // fixtures/index.ts + playwright.config.ts
+
+    return {
+      projectId,
+      projectName: project.name,
+      isConfigured: true,
+      connectedRepo: project.githubTestRepo,
+      repoUrl,
+      baseBranch,
+      currentBranch,
+      latestCommitSha: latestCommittedFile?.githubCommitSha || null,
+      latestCommitDate: latestCommittedFile?.committedAt
+        ? latestCommittedFile.committedAt.toISOString()
+        : null,
+      openPullRequest,
+      fileStats: {
+        totalSpecs,
+        totalPageObjects: project.pages.length,
+        hasFixtures: true,
+        hasConfig: true,
+        totalFiles,
+      },
+    };
   }
 
   /**

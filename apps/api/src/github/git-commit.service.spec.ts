@@ -21,6 +21,7 @@ describe("GitCommitService", () => {
       testFile: {
         count: vi.fn(),
         findMany: vi.fn(),
+        findFirst: vi.fn(),
         updateMany: vi.fn(),
       },
     };
@@ -348,6 +349,84 @@ describe("GitCommitService", () => {
     });
   });
 
+  describe("getRepoStatus", () => {
+    it("returns repository, branch, PR, and file statistics", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: "proj-1",
+        name: "Acme Web App",
+        githubTestRepo: "testpilot/repo",
+        githubBranch: "main",
+        githubInstallationId: "inst-123",
+        pages: [{ id: "p-1" }, { id: "p-2" }],
+      });
+
+      mockPrisma.testFile.findFirst.mockResolvedValue({
+        id: "tf-1",
+        githubCommitSha: "sha-999",
+        githubBranch: "generated/initial-tests",
+        githubPrNumber: 42,
+        githubPrUrl: "https://github.com/testpilot/repo/pull/42",
+        committedAt: new Date("2026-11-10T09:00:00Z"),
+      });
+
+      mockPrisma.testFile.count.mockResolvedValue(5);
+
+      mockOctokit.pulls.list.mockResolvedValue({
+        data: [
+          {
+            number: 42,
+            title: "🧪 Add Playwright Test Suite",
+            state: "open",
+            html_url: "https://github.com/testpilot/repo/pull/42",
+            created_at: "2026-11-10T09:00:00Z",
+            updated_at: "2026-11-10T09:05:00Z",
+          },
+        ],
+      });
+
+      const status = await service.getRepoStatus("proj-1");
+
+      expect(status.isConfigured).toBe(true);
+      expect(status.connectedRepo).toBe("testpilot/repo");
+      expect(status.repoUrl).toBe("https://github.com/testpilot/repo");
+      expect(status.baseBranch).toBe("main");
+      expect(status.currentBranch).toBe("generated/initial-tests");
+      expect(status.latestCommitSha).toBe("sha-999");
+      expect(status.openPullRequest).toEqual(
+        expect.objectContaining({
+          number: 42,
+          state: "open",
+          htmlUrl: "https://github.com/testpilot/repo/pull/42",
+        }),
+      );
+      expect(status.fileStats.totalSpecs).toBe(5);
+      expect(status.fileStats.totalPageObjects).toBe(2);
+      expect(status.fileStats.totalFiles).toBe(9);
+    });
+
+    it("returns unconfigured status when githubTestRepo is null", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: "proj-1",
+        name: "Acme Web App",
+        githubTestRepo: null,
+        pages: [],
+      });
+
+      const status = await service.getRepoStatus("proj-1");
+      expect(status.isConfigured).toBe(false);
+      expect(status.connectedRepo).toBeNull();
+      expect(status.openPullRequest).toBeNull();
+    });
+
+    it("throws NotFoundException if project not found", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(null);
+
+      await expect(service.getRepoStatus("proj-missing")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe("getOctokitClient", () => {
     it("returns octokitOverride when set", () => {
       const client = service.getOctokitClient();
@@ -361,3 +440,4 @@ describe("GitCommitService", () => {
     });
   });
 });
+

@@ -103,3 +103,35 @@ export const CommitHistoryItemSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type CommitHistoryItem = z.infer<typeof CommitHistoryItemSchema>;
+
+export const RepoStatusResponseSchema = z.object({
+  projectId: z.string(),
+  projectName: z.string(),
+  isConfigured: z.boolean(),
+  connectedRepo: z.string().nullable(),
+  repoUrl: z.string().nullable(),
+  baseBranch: z.string().default("main"),
+  currentBranch: z.string().nullable(),
+  latestCommitSha: z.string().nullable(),
+  latestCommitDate: z.string().nullable(),
+  openPullRequest: z
+    .object({
+      number: z.number().int(),
+      title: z.string(),
+      state: z.string(),
+      htmlUrl: z.string(),
+      branch: z.string(),
+      baseBranch: z.string(),
+      createdAt: z.string().nullable().optional(),
+      updatedAt: z.string().nullable().optional(),
+    })
+    .nullable(),
+  fileStats: z.object({
+    totalSpecs: z.number().int(),
+    totalPageObjects: z.number().int(),
+    hasFixtures: z.boolean(),
+    hasConfig: z.boolean(),
+    totalFiles: z.number().int(),
+  }),
+});
+export type RepoStatusResponse = z.infer<typeof RepoStatusResponseSchema>;

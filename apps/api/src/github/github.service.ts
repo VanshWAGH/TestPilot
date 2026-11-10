@@ -10,6 +10,7 @@ import {
   type GitHubStatusResponse,
   type CommitTestsResult,
   type CommitHistoryItem,
+  type RepoStatusResponse,
 } from "@testpilot/shared";
 
 @Injectable()
@@ -229,5 +230,12 @@ export class GitHubService {
    */
   async getCommitHistory(projectId: string): Promise<CommitHistoryItem[]> {
     return await this.gitCommitService.getCommitHistory(projectId);
+  }
+
+  /**
+   * Retrieves repository status, active branch, PR info, and test suite file metrics (Task 2.13).
+   */
+  async getRepoStatus(projectId: string): Promise<RepoStatusResponse> {
+    return await this.gitCommitService.getRepoStatus(projectId);
   }
 }

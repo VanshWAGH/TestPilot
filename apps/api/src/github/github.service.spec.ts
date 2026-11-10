@@ -22,6 +22,7 @@ describe("GitHubService", () => {
     mockGitCommitService = {
       commitTests: vi.fn(),
       getCommitHistory: vi.fn(),
+      getRepoStatus: vi.fn(),
     };
 
     service = new GitHubService(mockPrisma, mockGitCommitService);
@@ -201,6 +202,33 @@ describe("GitHubService", () => {
       const history = await service.getCommitHistory("proj-1");
       expect(mockGitCommitService.getCommitHistory).toHaveBeenCalledWith("proj-1");
       expect(history).toEqual(mockHistory);
+    });
+
+    it("delegates getRepoStatus to GitCommitService", async () => {
+      const mockStatus = {
+        projectId: "proj-1",
+        projectName: "Test Project",
+        isConfigured: true,
+        connectedRepo: "owner/repo",
+        repoUrl: "https://github.com/owner/repo",
+        baseBranch: "main",
+        currentBranch: "generated/initial-tests",
+        latestCommitSha: "sha123",
+        latestCommitDate: null,
+        openPullRequest: null,
+        fileStats: {
+          totalSpecs: 5,
+          totalPageObjects: 2,
+          hasFixtures: true,
+          hasConfig: true,
+          totalFiles: 9,
+        },
+      };
+      mockGitCommitService.getRepoStatus.mockResolvedValue(mockStatus);
+
+      const status = await service.getRepoStatus("proj-1");
+      expect(mockGitCommitService.getRepoStatus).toHaveBeenCalledWith("proj-1");
+      expect(status).toEqual(mockStatus);
     });
   });
 });

@@ -19,6 +19,7 @@ describe("GitHubController", () => {
         commitSha: "sha123",
       }),
       getCommitHistory: vi.fn().mockResolvedValue([{ id: "tf-1" }]),
+      getRepoStatus: vi.fn().mockResolvedValue({ isConfigured: true, connectedRepo: "owner/repo" }),
     };
 
     controller = new GitHubController(mockService);
@@ -77,5 +78,11 @@ describe("GitHubController", () => {
     const res = await controller.getCommitHistory("proj-1");
     expect(res).toEqual([{ id: "tf-1" }]);
     expect(mockService.getCommitHistory).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("getRepoStatus delegates to service", async () => {
+    const res = await controller.getRepoStatus("proj-1");
+    expect(res).toEqual({ isConfigured: true, connectedRepo: "owner/repo" });
+    expect(mockService.getRepoStatus).toHaveBeenCalledWith("proj-1");
   });
 });

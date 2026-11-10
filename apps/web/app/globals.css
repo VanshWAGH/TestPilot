@@ -350,7 +350,7 @@ body {
 
 .auth-card {
   width: 100%;
-  max-width: 410px;
+  max-width: 450px;
   border: 1px solid var(--tp-line);
   border-radius: 20px;
   background: var(--tp-card);
@@ -416,7 +416,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 410px;
+  max-width: 450px;
   width: 100%;
   margin-top: 14px;
   font-size: 12px;

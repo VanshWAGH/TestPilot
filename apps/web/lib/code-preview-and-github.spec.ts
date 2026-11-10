@@ -10,6 +10,7 @@ import {
   GITHUB_APP_REQUIRED_PERMISSIONS,
   CommitTestsResultSchema,
   CommitHistoryItemSchema,
+  RepoStatusResponseSchema,
 } from "@testpilot/shared";
 
 describe("Code Preview & GitHub App Schemas (Tasks 2.10 & 2.11)", () => {
@@ -239,6 +240,41 @@ describe("Code Preview & GitHub App Schemas (Tasks 2.10 & 2.11)", () => {
       expect(parsed.scenarioTitle).toBe("User can log in");
       expect(parsed.githubCommitSha).toBe("sha-abc");
       expect(parsed.githubPrNumber).toBe(1);
+    });
+
+    it("validates repository status response schema (Task 2.13)", () => {
+      const repoStatus = {
+        projectId: "proj-1",
+        projectName: "SauceDemo",
+        isConfigured: true,
+        connectedRepo: "VanshWAGH/TestPilot-Tests",
+        repoUrl: "https://github.com/VanshWAGH/TestPilot-Tests",
+        baseBranch: "main",
+        currentBranch: "generated/initial-tests",
+        latestCommitSha: "sha-1234567",
+        latestCommitDate: new Date().toISOString(),
+        openPullRequest: {
+          number: 42,
+          title: "🧪 Add Playwright Test Suite",
+          state: "open",
+          htmlUrl: "https://github.com/VanshWAGH/TestPilot-Tests/pull/42",
+          branch: "generated/initial-tests",
+          baseBranch: "main",
+        },
+        fileStats: {
+          totalSpecs: 5,
+          totalPageObjects: 2,
+          hasFixtures: true,
+          hasConfig: true,
+          totalFiles: 9,
+        },
+      };
+
+      const parsed = RepoStatusResponseSchema.parse(repoStatus);
+      expect(parsed.isConfigured).toBe(true);
+      expect(parsed.connectedRepo).toBe("VanshWAGH/TestPilot-Tests");
+      expect(parsed.openPullRequest?.number).toBe(42);
+      expect(parsed.fileStats.totalFiles).toBe(9);
     });
   });
 });

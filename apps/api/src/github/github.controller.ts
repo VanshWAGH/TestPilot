@@ -133,4 +133,18 @@ export class GitHubController {
   ) {
     return await this.githubService.getCommitHistory(projectId);
   }
+
+  @Get("projects/:projectId/github/repo-status")
+  @ApiOperation({
+    summary: "Get comprehensive repository, branch, PR, and test-suite metrics (Task 2.13)",
+    description:
+      "Returns GitHub test repository URL, default branch, active generated branch, open Pull Request state, latest commit SHA, and test file statistics.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Repository and Pull Request status" })
+  async getRepoStatus(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ) {
+    return await this.githubService.getRepoStatus(projectId);
+  }
 }
