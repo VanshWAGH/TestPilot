@@ -5,6 +5,7 @@ import { NotFoundException } from "@nestjs/common";
 describe("GitHubService", () => {
   let service: GitHubService;
   let mockPrisma: any;
+  let mockGitCommitService: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -18,7 +19,12 @@ describe("GitHubService", () => {
       },
     };
 
-    service = new GitHubService(mockPrisma);
+    mockGitCommitService = {
+      commitTests: vi.fn(),
+      getCommitHistory: vi.fn(),
+    };
+
+    service = new GitHubService(mockPrisma, mockGitCommitService);
   });
 
   describe("getAppInfo", () => {
@@ -154,6 +160,47 @@ describe("GitHubService", () => {
       expect(status.permissionCheck.issues).toBe(true);
       expect(status.permissionCheck.pullRequests).toBe(true);
       expect(status.permissionCheck.actions).toBe(true);
+    });
+  });
+
+  describe("commitTests & getCommitHistory delegation", () => {
+    it("delegates commitTests to GitCommitService", async () => {
+      const mockResult = {
+        projectId: "proj-1",
+        branch: "generated/initial-tests",
+        commitSha: "sha123",
+        filesCommitted: ["tests/login.spec.ts"],
+        pullRequestUrl: "https://github.com/owner/repo/pull/1",
+        pullRequestNumber: 1,
+        repoUrl: "https://github.com/owner/repo",
+      };
+      mockGitCommitService.commitTests.mockResolvedValue(mockResult);
+
+      const result = await service.commitTests("proj-1", { branch: "generated/initial-tests" });
+      expect(mockGitCommitService.commitTests).toHaveBeenCalledWith("proj-1", { branch: "generated/initial-tests" });
+      expect(result).toEqual(mockResult);
+    });
+
+    it("delegates getCommitHistory to GitCommitService", async () => {
+      const mockHistory = [
+        {
+          id: "tf-1",
+          scenarioId: "sc-1",
+          scenarioTitle: "Login Test",
+          filePath: "tests/login.spec.ts",
+          githubCommitSha: "sha123",
+          githubBranch: "generated/initial-tests",
+          githubPrUrl: "https://github.com/owner/repo/pull/1",
+          githubPrNumber: 1,
+          committedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      mockGitCommitService.getCommitHistory.mockResolvedValue(mockHistory);
+
+      const history = await service.getCommitHistory("proj-1");
+      expect(mockGitCommitService.getCommitHistory).toHaveBeenCalledWith("proj-1");
+      expect(history).toEqual(mockHistory);
     });
   });
 });

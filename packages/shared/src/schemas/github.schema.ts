@@ -78,3 +78,28 @@ export const GitHubStatusResponseSchema = z.object({
   }),
 });
 export type GitHubStatusResponse = z.infer<typeof GitHubStatusResponseSchema>;
+
+export const CommitTestsResultSchema = z.object({
+  projectId: z.string(),
+  branch: z.string(),
+  commitSha: z.string(),
+  filesCommitted: z.array(z.string()),
+  pullRequestUrl: z.string().nullable(),
+  pullRequestNumber: z.number().int().nullable(),
+  repoUrl: z.string(),
+});
+export type CommitTestsResult = z.infer<typeof CommitTestsResultSchema>;
+
+export const CommitHistoryItemSchema = z.object({
+  id: z.string(),
+  scenarioId: z.string(),
+  scenarioTitle: z.string(),
+  filePath: z.string(),
+  githubCommitSha: z.string().nullable(),
+  githubBranch: z.string().nullable(),
+  githubPrUrl: z.string().nullable(),
+  githubPrNumber: z.number().int().nullable(),
+  committedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type CommitHistoryItem = z.infer<typeof CommitHistoryItemSchema>;

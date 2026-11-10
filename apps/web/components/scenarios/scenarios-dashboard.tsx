@@ -17,6 +17,7 @@ import {
   Loader2,
   Code2,
   FileCode2,
+  GitPullRequest,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ import { ScenarioEditDialog, ScenarioItem } from "./scenario-edit-dialog";
 import { ScenarioGeneratorDialog } from "./scenario-generator-dialog";
 import { CodePreviewDialog } from "./code-preview-dialog";
 import { SuiteBundleDialog } from "./suite-bundle-dialog";
+import { CommitToGitHubDialog } from "./commit-to-github-dialog";
 
 export interface ProjectOption {
   id: string;
@@ -57,6 +59,7 @@ export function ScenariosDashboard({
   const [editingScenario, setEditingScenario] = useState<ScenarioItem | null>(null);
   const [previewScenario, setPreviewScenario] = useState<ScenarioItem | null>(null);
   const [showSuiteBundle, setShowSuiteBundle] = useState(false);
+  const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [showGeneratorDialog, setShowGeneratorDialog] = useState(false);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
@@ -234,6 +237,17 @@ export function ScenariosDashboard({
           >
             <Code2 className="w-3.5 h-3.5" />
             <span>Explore Suite Code</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 shadow-sm"
+            onClick={() => setShowCommitDialog(true)}
+            disabled={!selectedProjectId}
+          >
+            <GitPullRequest className="w-3.5 h-3.5" />
+            <span>Commit to GitHub</span>
           </Button>
 
           <Button
@@ -469,6 +483,17 @@ export function ScenariosDashboard({
           projectName={activeProject.name}
           open={showSuiteBundle}
           onOpenChange={setShowSuiteBundle}
+        />
+      )}
+
+      {/* ─── Commit to GitHub Dialog (Task 2.12) ───────────────────────────── */}
+      {activeProject && (
+        <CommitToGitHubDialog
+          projectId={activeProject.id}
+          projectName={activeProject.name}
+          open={showCommitDialog}
+          onOpenChange={setShowCommitDialog}
+          onCommitted={fetchScenarios}
         />
       )}
 
