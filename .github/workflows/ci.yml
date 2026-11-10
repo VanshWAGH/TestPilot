@@ -14,6 +14,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_bWFnaWNhbC1zd2FuLTE4NzIuY2xlcmsuYWNjb3VudHMuZGV2JA
+  CLERK_SECRET_KEY: sk_test_jfl6XQiLLOLXTJVk0QAabcZhbnpWB4RMiG8Km4BpQI
+
 jobs:
   lint-and-typecheck:
     name: Lint & Type-Check
@@ -105,6 +109,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: pnpm db:generate
+
+      - name: Build internal packages
+        run: pnpm --filter @testpilot/shared --filter @testpilot/db run build
 
       - name: Build monorepo
         run: pnpm build
