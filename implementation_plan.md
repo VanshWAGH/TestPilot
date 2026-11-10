@@ -254,8 +254,8 @@ testpilot/
 | 2.9 | **Playwright config generation** | Generate `playwright.config.ts` with project configs, reporter settings, base URL from environment. | ✅ **Completed** (Playwright configuration generator via `PlaywrightConfigGeneratorService` generating `playwright.config.ts` with multi-browser matrix, auth setup project dependencies, reporter settings, and TypeScript syntax validation) |
 | 2.10 | **Code preview UI** | Syntax-highlighted code preview (Shiki) for generated test files, page objects, fixtures, config. Side-by-side: scenario ↔ code. | ✅ **Completed** (Rich side-by-side scenario ↔ code preview with Shiki syntax highlighting (`CodeViewer`, `CodePreviewDialog`), multi-file `SuiteBundleDialog`, row-level code preview actions, copy/download utilities) |
 | 2.11 | **GitHub App setup** | GitHub App registration. Installation flow in Settings UI. Permission scoping (contents: write, issues: write, pull_requests: write, actions: write). | ✅ **Completed** (GitHub App integration service and REST APIs, 1-click App Manifest registration flow, installation storage in Prisma DB, permission scope enforcement (`contents: write`, `issues: write`, `pull_requests: write`, `actions: write`), and `/settings` UI dashboard) |
-| 2.12 | **Git commit service** | Commit generated files to test-suite repo. Branch strategy: `generated/initial-tests` or `generated/crawl-<date>`. Open PR for review. | PR opened on GitHub |
-| 2.13 | **Test-suite repo status UI** | Show repo link, branch, PR status, file tree of generated tests. | Repo status visible |
+| 2.12 | **Git commit service** | Commit generated files to test-suite repo. Branch strategy: `generated/initial-tests` or `generated/crawl-<date>`. Open PR for review. | ✅ **Completed** (Automated Git commit service via `GitCommitService` with Octokit, atomic Git Tree/Commit API, branch strategy (`generated/initial-tests` or `generated/crawl-<YYYYMMDD>`), automatic PR creation/update with rich test summary table and Playwright instructions, database persistence, and `CommitToGitHubDialog` UI) |
+| 2.13 | **Test-suite repo status UI** | Show repo link, branch, PR status, file tree of generated tests. | ✅ **Completed** (Rich `RepoStatusCard` UI displaying repository URL, active generated branch vs base branch, live Pull Request status card with GitHub direct link, interactive Playwright file tree explorer with syntax preview, Git commit history timeline, and integration across `/scenarios` view toggle & `/settings` tab) |
 | 2.14 | **Template library** | Built-in test templates for common patterns: login, CRUD, form validation, navigation, API contract. LLM uses these as few-shot examples. | Templates in codebase |
 | 2.15 | **Dry-run validation** | Run `npx tsc --noEmit` on generated code. Run `npx playwright test --list` to verify test discovery. Report any compilation errors. | Broken code caught |
 
@@ -263,7 +263,7 @@ testpilot/
 - [ ] LLM generates 10–15 scenarios for SauceDemo
 - [x] Scenarios reviewable/editable in UI
 - [x] Approved scenarios produce valid Playwright TypeScript code
-- [ ] Code committed to GitHub repo via PR
+- [x] Code committed to GitHub repo via PR
 - [ ] Code compiles and tests are discoverable
 
 ---

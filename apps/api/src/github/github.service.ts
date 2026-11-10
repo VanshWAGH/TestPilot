@@ -2,10 +2,15 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConnectGitHubRepoDto } from "./dto/connect-repo.dto";
 import { SaveGitHubInstallationDto } from "./dto/save-installation.dto";
+import { CommitTestsDto } from "./dto/commit-tests.dto";
+import { GitCommitService } from "./git-commit.service";
 import {
   GITHUB_APP_REQUIRED_PERMISSIONS,
   GITHUB_APP_EVENTS,
   type GitHubStatusResponse,
+  type CommitTestsResult,
+  type CommitHistoryItem,
+  type RepoStatusResponse,
 } from "@testpilot/shared";
 
 @Injectable()
@@ -21,7 +26,10 @@ export class GitHubService {
   private readonly webhookUrl =
     process.env.GITHUB_WEBHOOK_URL || `${this.baseUrl}/api/v1/github/webhook`;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gitCommitService: GitCommitService,
+  ) {}
 
   /**
    * Retrieves GitHub App registration metadata, permission scopes, and 1-click manifest payload.
@@ -205,5 +213,29 @@ export class GitHubService {
         actions: true,
       },
     };
+  }
+
+  /**
+   * Commits generated Playwright test suite to GitHub and creates/updates a Pull Request.
+   */
+  async commitTests(
+    projectId: string,
+    dto?: CommitTestsDto,
+  ): Promise<CommitTestsResult> {
+    return await this.gitCommitService.commitTests(projectId, dto);
+  }
+
+  /**
+   * Retrieves history of committed test suites for a project.
+   */
+  async getCommitHistory(projectId: string): Promise<CommitHistoryItem[]> {
+    return await this.gitCommitService.getCommitHistory(projectId);
+  }
+
+  /**
+   * Retrieves repository status, active branch, PR info, and test suite file metrics (Task 2.13).
+   */
+  async getRepoStatus(projectId: string): Promise<RepoStatusResponse> {
+    return await this.gitCommitService.getRepoStatus(projectId);
   }
 }

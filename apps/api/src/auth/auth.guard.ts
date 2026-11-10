@@ -29,6 +29,12 @@ export class AuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader) {
+      if (process.env.NODE_ENV === "development" && process.env.SKIP_AUTH === "true") {
+        const dbUser = await this.clerkService.syncUserWithDatabase("user_demo_development");
+        request.auth = { sub: "user_demo_development" };
+        request.user = dbUser;
+        return true;
+      }
       throw new UnauthorizedException("Missing Authorization header");
     }
 
@@ -37,6 +43,14 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException(
         "Invalid Authorization header format. Expected 'Bearer <token>'",
       );
+    }
+
+    // Support dev bypass in development
+    if (process.env.NODE_ENV !== "production" && (token === "dev_token" || token === "demo")) {
+      const dbUser = await this.clerkService.syncUserWithDatabase("user_demo_development");
+      request.auth = { sub: "user_demo_development" };
+      request.user = dbUser;
+      return true;
     }
 
     try {

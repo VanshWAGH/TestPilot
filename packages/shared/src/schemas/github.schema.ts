@@ -78,3 +78,60 @@ export const GitHubStatusResponseSchema = z.object({
   }),
 });
 export type GitHubStatusResponse = z.infer<typeof GitHubStatusResponseSchema>;
+
+export const CommitTestsResultSchema = z.object({
+  projectId: z.string(),
+  branch: z.string(),
+  commitSha: z.string(),
+  filesCommitted: z.array(z.string()),
+  pullRequestUrl: z.string().nullable(),
+  pullRequestNumber: z.number().int().nullable(),
+  repoUrl: z.string(),
+});
+export type CommitTestsResult = z.infer<typeof CommitTestsResultSchema>;
+
+export const CommitHistoryItemSchema = z.object({
+  id: z.string(),
+  scenarioId: z.string(),
+  scenarioTitle: z.string(),
+  filePath: z.string(),
+  githubCommitSha: z.string().nullable(),
+  githubBranch: z.string().nullable(),
+  githubPrUrl: z.string().nullable(),
+  githubPrNumber: z.number().int().nullable(),
+  committedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type CommitHistoryItem = z.infer<typeof CommitHistoryItemSchema>;
+
+export const RepoStatusResponseSchema = z.object({
+  projectId: z.string(),
+  projectName: z.string(),
+  isConfigured: z.boolean(),
+  connectedRepo: z.string().nullable(),
+  repoUrl: z.string().nullable(),
+  baseBranch: z.string().default("main"),
+  currentBranch: z.string().nullable(),
+  latestCommitSha: z.string().nullable(),
+  latestCommitDate: z.string().nullable(),
+  openPullRequest: z
+    .object({
+      number: z.number().int(),
+      title: z.string(),
+      state: z.string(),
+      htmlUrl: z.string(),
+      branch: z.string(),
+      baseBranch: z.string(),
+      createdAt: z.string().nullable().optional(),
+      updatedAt: z.string().nullable().optional(),
+    })
+    .nullable(),
+  fileStats: z.object({
+    totalSpecs: z.number().int(),
+    totalPageObjects: z.number().int(),
+    hasFixtures: z.boolean(),
+    hasConfig: z.boolean(),
+    totalFiles: z.number().int(),
+  }),
+});
+export type RepoStatusResponse = z.infer<typeof RepoStatusResponseSchema>;

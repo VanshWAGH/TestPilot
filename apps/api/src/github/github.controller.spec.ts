@@ -13,6 +13,13 @@ describe("GitHubController", () => {
       getProjectGitHubStatus: vi.fn().mockResolvedValue({ isConfigured: true }),
       connectRepo: vi.fn().mockResolvedValue({ githubAppInstalled: true }),
       disconnectRepo: vi.fn().mockResolvedValue({ success: true }),
+      commitTests: vi.fn().mockResolvedValue({
+        projectId: "proj-1",
+        branch: "generated/initial-tests",
+        commitSha: "sha123",
+      }),
+      getCommitHistory: vi.fn().mockResolvedValue([{ id: "tf-1" }]),
+      getRepoStatus: vi.fn().mockResolvedValue({ isConfigured: true, connectedRepo: "owner/repo" }),
     };
 
     controller = new GitHubController(mockService);
@@ -54,5 +61,28 @@ describe("GitHubController", () => {
     const res = await controller.disconnectRepo("proj-1");
     expect(res).toEqual({ success: true });
     expect(mockService.disconnectRepo).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("commitTests delegates to service", async () => {
+    const dto = { branch: "generated/initial-tests" };
+    const res = await controller.commitTests("proj-1", dto);
+    expect(res).toEqual({
+      projectId: "proj-1",
+      branch: "generated/initial-tests",
+      commitSha: "sha123",
+    });
+    expect(mockService.commitTests).toHaveBeenCalledWith("proj-1", dto);
+  });
+
+  it("getCommitHistory delegates to service", async () => {
+    const res = await controller.getCommitHistory("proj-1");
+    expect(res).toEqual([{ id: "tf-1" }]);
+    expect(mockService.getCommitHistory).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("getRepoStatus delegates to service", async () => {
+    const res = await controller.getRepoStatus("proj-1");
+    expect(res).toEqual({ isConfigured: true, connectedRepo: "owner/repo" });
+    expect(mockService.getRepoStatus).toHaveBeenCalledWith("proj-1");
   });
 });

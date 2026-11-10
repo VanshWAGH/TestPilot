@@ -237,6 +237,10 @@ model TestFile {
   pageObjectPath    String?      @map("page_object_path")
   pageObjectContent String?      @map("page_object_content") @db.Text
   githubCommitSha   String?      @map("github_commit_sha")
+  githubBranch      String?      @map("github_branch")
+  githubPrUrl       String?      @map("github_pr_url")
+  githubPrNumber    Int?         @map("github_pr_number")
+  committedAt       DateTime?    @map("committed_at")
   testResults       TestResult[]
   createdAt         DateTime     @default(now()) @map("created_at")
 

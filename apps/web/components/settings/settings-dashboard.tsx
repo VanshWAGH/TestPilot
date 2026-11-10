@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GitHubSettingsCard } from "./github-settings-card";
+import { RepoStatusCard } from "../scenarios/repo-status-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,6 +22,9 @@ interface SettingsDashboardProps {
 
 export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
   const [activeTab, setActiveTab] = useState<string>("github");
+  const [selectedRepoProjectId, setSelectedRepoProjectId] = useState<string>(
+    initialProjects[0]?.id || "",
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -48,14 +52,21 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
             className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
           >
             <FolderGit2 className="w-3.5 h-3.5" />
-            GitHub App & Repositories
+            GitHub App &amp; Repositories
+          </TabsTrigger>
+          <TabsTrigger
+            value="repo"
+            className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Test-Suite Repository
           </TabsTrigger>
           <TabsTrigger
             value="preferences"
             className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
           >
             <Sliders className="w-3.5 h-3.5" />
-            Healing & Automation
+            Healing &amp; Automation
           </TabsTrigger>
           <TabsTrigger
             value="environments"
@@ -69,6 +80,39 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
         {/* ─── GitHub App Tab (Task 2.11) ─────────────────────────────────────── */}
         <TabsContent value="github" className="space-y-6">
           <GitHubSettingsCard projects={initialProjects} />
+        </TabsContent>
+
+        {/* ─── Test-Suite Repository Tab (Task 2.13) ─────────────────────────── */}
+        <TabsContent value="repo" className="space-y-6">
+          {initialProjects.length > 1 && (
+            <div className="flex items-center gap-2 bg-secondary/30 border border-border p-2 rounded-lg max-w-sm">
+              <span className="text-xs text-muted-foreground font-medium pl-1">Project:</span>
+              <select
+                value={selectedRepoProjectId}
+                onChange={(e) => setSelectedRepoProjectId(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-foreground focus:outline-none cursor-pointer flex-1"
+              >
+                {initialProjects.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-card text-foreground">
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {selectedRepoProjectId ? (
+            <RepoStatusCard
+              projectId={selectedRepoProjectId}
+              projectName={
+                initialProjects.find((p) => p.id === selectedRepoProjectId)?.name || "Project"
+              }
+            />
+          ) : (
+            <div className="p-8 text-center text-xs text-muted-foreground">
+              No projects created yet.
+            </div>
+          )}
         </TabsContent>
 
         {/* ─── Healing & Automation Tab ───────────────────────────────────────── */}

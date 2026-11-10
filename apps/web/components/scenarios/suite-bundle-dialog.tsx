@@ -14,6 +14,7 @@ import {
   Check,
   ChevronRight,
   Sparkles,
+  GitPullRequest,
 } from "lucide-react";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CodeViewer } from "./code-viewer";
+import { CommitToGitHubDialog } from "./commit-to-github-dialog";
 
 interface SuiteBundleDialogProps {
   projectId: string;
@@ -49,6 +51,7 @@ export function SuiteBundleDialog({
 }: SuiteBundleDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string>("");
 
@@ -184,6 +187,15 @@ export function SuiteBundleDialog({
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setShowCommitDialog(true)}
+              className="text-xs h-8 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+            >
+              <GitPullRequest className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+              Commit &amp; Open PR
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleBatchGenerate}
               disabled={isGenerating || isLoading}
               className="text-xs h-8"
@@ -307,6 +319,14 @@ export function SuiteBundleDialog({
             )}
           </div>
         </div>
+
+        <CommitToGitHubDialog
+          projectId={projectId}
+          projectName={projectName}
+          open={showCommitDialog}
+          onOpenChange={setShowCommitDialog}
+          onCommitted={fetchBundle}
+        />
       </DialogContent>
     </Dialog>
   );

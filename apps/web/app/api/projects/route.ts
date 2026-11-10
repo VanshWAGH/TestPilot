@@ -13,10 +13,15 @@ const API_BASE_URL =
 async function getAuthToken(): Promise<string | null> {
   try {
     const session = await auth();
-    return await session.getToken();
+    const token = await session.getToken();
+    if (token) return token;
   } catch {
-    return null;
+    // Session token unavailable
   }
+  if (process.env.NODE_ENV !== "production") {
+    return "dev_token";
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

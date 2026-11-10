@@ -8,6 +8,9 @@ import {
   ConnectGitHubRepoSchema,
   GitHubStatusResponseSchema,
   GITHUB_APP_REQUIRED_PERMISSIONS,
+  CommitTestsResultSchema,
+  CommitHistoryItemSchema,
+  RepoStatusResponseSchema,
 } from "@testpilot/shared";
 
 describe("Code Preview & GitHub App Schemas (Tasks 2.10 & 2.11)", () => {
@@ -193,6 +196,85 @@ describe("Code Preview & GitHub App Schemas (Tasks 2.10 & 2.11)", () => {
       expect(parsed.isConfigured).toBe(true);
       expect(parsed.permissionCheck.contents).toBe(true);
       expect(parsed.permissionCheck.actions).toBe(true);
+    });
+  });
+
+  describe("Task 2.12: Git Commit Service Schemas", () => {
+    it("validates commit tests result schema", () => {
+      const result = {
+        projectId: "proj-1",
+        branch: "generated/initial-tests",
+        commitSha: "sha-1234567890abcdef",
+        filesCommitted: [
+          "tests/scenarios/login.spec.ts",
+          "pages/login.page.ts",
+          "fixtures/index.ts",
+          "playwright.config.ts",
+        ],
+        pullRequestUrl: "https://github.com/owner/repo/pull/1",
+        pullRequestNumber: 1,
+        repoUrl: "https://github.com/owner/repo",
+      };
+
+      const parsed = CommitTestsResultSchema.parse(result);
+      expect(parsed.branch).toBe("generated/initial-tests");
+      expect(parsed.pullRequestNumber).toBe(1);
+      expect(parsed.filesCommitted).toHaveLength(4);
+    });
+
+    it("validates commit history item schema", () => {
+      const historyItem = {
+        id: "tf-1",
+        scenarioId: "sc-1",
+        scenarioTitle: "User can log in",
+        filePath: "tests/scenarios/login.spec.ts",
+        githubCommitSha: "sha-abc",
+        githubBranch: "generated/initial-tests",
+        githubPrUrl: "https://github.com/owner/repo/pull/1",
+        githubPrNumber: 1,
+        committedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+
+      const parsed = CommitHistoryItemSchema.parse(historyItem);
+      expect(parsed.scenarioTitle).toBe("User can log in");
+      expect(parsed.githubCommitSha).toBe("sha-abc");
+      expect(parsed.githubPrNumber).toBe(1);
+    });
+
+    it("validates repository status response schema (Task 2.13)", () => {
+      const repoStatus = {
+        projectId: "proj-1",
+        projectName: "SauceDemo",
+        isConfigured: true,
+        connectedRepo: "VanshWAGH/TestPilot-Tests",
+        repoUrl: "https://github.com/VanshWAGH/TestPilot-Tests",
+        baseBranch: "main",
+        currentBranch: "generated/initial-tests",
+        latestCommitSha: "sha-1234567",
+        latestCommitDate: new Date().toISOString(),
+        openPullRequest: {
+          number: 42,
+          title: "🧪 Add Playwright Test Suite",
+          state: "open",
+          htmlUrl: "https://github.com/VanshWAGH/TestPilot-Tests/pull/42",
+          branch: "generated/initial-tests",
+          baseBranch: "main",
+        },
+        fileStats: {
+          totalSpecs: 5,
+          totalPageObjects: 2,
+          hasFixtures: true,
+          hasConfig: true,
+          totalFiles: 9,
+        },
+      };
+
+      const parsed = RepoStatusResponseSchema.parse(repoStatus);
+      expect(parsed.isConfigured).toBe(true);
+      expect(parsed.connectedRepo).toBe("VanshWAGH/TestPilot-Tests");
+      expect(parsed.openPullRequest?.number).toBe(42);
+      expect(parsed.fileStats.totalFiles).toBe(9);
     });
   });
 });

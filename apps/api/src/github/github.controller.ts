@@ -20,6 +20,7 @@ import {
 import { GitHubService } from "./github.service";
 import { ConnectGitHubRepoDto } from "./dto/connect-repo.dto";
 import { SaveGitHubInstallationDto } from "./dto/save-installation.dto";
+import { CommitTestsDto } from "./dto/commit-tests.dto";
 import { AuthGuard } from "../auth/auth.guard";
 import { Public } from "../auth/public.decorator";
 
@@ -101,5 +102,49 @@ export class GitHubController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
   ) {
     return await this.githubService.disconnectRepo(projectId);
+  }
+
+  @Post("projects/:projectId/github/commit")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Commit generated test suite to GitHub repository and open PR (Task 2.12)",
+    description:
+      "Commits approved Playwright test files, page objects, fixtures, and config to the connected repository using the branch strategy (generated/initial-tests or generated/crawl-<date>) and opens a Pull Request.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Commit details and Pull Request URL" })
+  async commitTests(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: CommitTestsDto,
+  ) {
+    return await this.githubService.commitTests(projectId, dto);
+  }
+
+  @Get("projects/:projectId/github/commits")
+  @ApiOperation({
+    summary: "Get Git commit and PR history for project test suites",
+    description:
+      "Returns list of all test files that have been committed to GitHub with their branch names, commit SHAs, and PR URLs.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "List of committed test files" })
+  async getCommitHistory(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ) {
+    return await this.githubService.getCommitHistory(projectId);
+  }
+
+  @Get("projects/:projectId/github/repo-status")
+  @ApiOperation({
+    summary: "Get comprehensive repository, branch, PR, and test-suite metrics (Task 2.13)",
+    description:
+      "Returns GitHub test repository URL, default branch, active generated branch, open Pull Request state, latest commit SHA, and test file statistics.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Repository and Pull Request status" })
+  async getRepoStatus(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ) {
+    return await this.githubService.getRepoStatus(projectId);
   }
 }

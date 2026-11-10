@@ -17,6 +17,7 @@ import {
   Loader2,
   Code2,
   FileCode2,
+  GitPullRequest,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,9 @@ import { ScenarioEditDialog, ScenarioItem } from "./scenario-edit-dialog";
 import { ScenarioGeneratorDialog } from "./scenario-generator-dialog";
 import { CodePreviewDialog } from "./code-preview-dialog";
 import { SuiteBundleDialog } from "./suite-bundle-dialog";
+import { CommitToGitHubDialog } from "./commit-to-github-dialog";
+import { RepoStatusCard } from "./repo-status-card";
+import { cn } from "cn";
 
 export interface ProjectOption {
   id: string;
@@ -53,10 +57,12 @@ export function ScenariosDashboard({
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [riskFilter, setRiskFilter] = useState<string>("all");
 
+  const [activeView, setActiveView] = useState<"scenarios" | "repository">("scenarios");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingScenario, setEditingScenario] = useState<ScenarioItem | null>(null);
   const [previewScenario, setPreviewScenario] = useState<ScenarioItem | null>(null);
   const [showSuiteBundle, setShowSuiteBundle] = useState(false);
+  const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [showGeneratorDialog, setShowGeneratorDialog] = useState(false);
   const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
@@ -238,6 +244,17 @@ export function ScenariosDashboard({
 
           <Button
             size="sm"
+            variant="outline"
+            className="gap-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 shadow-sm"
+            onClick={() => setShowCommitDialog(true)}
+            disabled={!selectedProjectId}
+          >
+            <GitPullRequest className="w-3.5 h-3.5" />
+            <span>Commit to GitHub</span>
+          </Button>
+
+          <Button
+            size="sm"
             className="gap-2 shadow-sm shadow-primary/20"
             onClick={() => setShowGeneratorDialog(true)}
             disabled={!selectedProjectId}
@@ -248,8 +265,43 @@ export function ScenariosDashboard({
         </div>
       </div>
 
-      {/* ─── Summary Stat Cards ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ─── View Toggle: Scenarios vs Test-Suite Repository (Task 2.13) ──── */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <button
+          onClick={() => setActiveView("scenarios")}
+          className={cn(
+            "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2",
+            activeView === "scenarios"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
+          )}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Scenarios &amp; Review</span>
+        </button>
+        <button
+          onClick={() => setActiveView("repository")}
+          className={cn(
+            "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2",
+            activeView === "repository"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
+          )}
+        >
+          <FolderGit2 className="w-3.5 h-3.5" />
+          <span>Repository &amp; PR Status</span>
+        </button>
+      </div>
+
+      {activeView === "repository" ? (
+        <RepoStatusCard
+          projectId={selectedProjectId}
+          projectName={activeProject?.name || "Project"}
+        />
+      ) : (
+        <>
+          {/* ─── Summary Stat Cards ────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-card/50 backdrop-blur-sm border-border/80">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
             <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -432,16 +484,18 @@ export function ScenariosDashboard({
       )}
 
       {/* ─── Interactive Table ────────────────────────────────────────────── */}
-      <ScenarioTable
-        scenarios={filteredScenarios}
-        selectedIds={selectedIds}
-        onToggleSelect={handleToggleSelect}
-        onSelectAll={handleSelectAll}
-        onStatusChange={handleStatusChange}
-        onEdit={(sc) => setEditingScenario(sc)}
-        onViewCode={(sc) => setPreviewScenario(sc)}
-        onOpenGenerate={() => setShowGeneratorDialog(true)}
-      />
+        <ScenarioTable
+          scenarios={filteredScenarios}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
+          onSelectAll={handleSelectAll}
+          onStatusChange={handleStatusChange}
+          onEdit={(sc) => setEditingScenario(sc)}
+          onViewCode={(sc) => setPreviewScenario(sc)}
+          onOpenGenerate={() => setShowGeneratorDialog(true)}
+        />
+      </>
+      )}
 
       {/* ─── Edit Dialog (Task 2.5) ───────────────────────────────────────── */}
       <ScenarioEditDialog
@@ -469,6 +523,17 @@ export function ScenariosDashboard({
           projectName={activeProject.name}
           open={showSuiteBundle}
           onOpenChange={setShowSuiteBundle}
+        />
+      )}
+
+      {/* ─── Commit to GitHub Dialog (Task 2.12) ───────────────────────────── */}
+      {activeProject && (
+        <CommitToGitHubDialog
+          projectId={activeProject.id}
+          projectName={activeProject.name}
+          open={showCommitDialog}
+          onOpenChange={setShowCommitDialog}
+          onCommitted={fetchScenarios}
         />
       )}
 

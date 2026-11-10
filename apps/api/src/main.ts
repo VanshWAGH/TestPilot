@@ -3,13 +3,13 @@ import * as path from "path";
 
 // Load environment variables robustly across all execution modes
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
-dotenv.config({ path: path.resolve(__dirname, "../../.env.local") });
-dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
+dotenv.config({ path: path.resolve(__dirname, "../.env.local"), override: true });
+dotenv.config({ path: path.resolve(__dirname, "../../.env.local"), override: true });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env.local"), override: true });
 
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
