@@ -260,7 +260,7 @@ testpilot/
 | 2.15 | **Dry-run validation** | Run `npx tsc --noEmit` on generated code. Run `npx playwright test --list` to verify test discovery. Report any compilation errors. | ✅ **Completed** (Virtual dry-run test validator via `DryRunValidationService` performing in-memory TypeScript AST compilation, Playwright test discovery, duplicate title and empty body detection, unawaited Playwright calls warnings, and project-level test bundle discovery API) |
 
 #### Definition of Done
-- [ ] LLM generates 10–15 scenarios for SauceDemo
+- [x] LLM generates 10–15 scenarios for SauceDemo
 - [x] Scenarios reviewable/editable in UI
 - [x] Approved scenarios produce valid Playwright TypeScript code
 - [x] Code committed to GitHub repo via PR
