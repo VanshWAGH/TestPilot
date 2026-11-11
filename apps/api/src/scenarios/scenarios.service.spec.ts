@@ -76,6 +76,27 @@ describe("ScenariosService", () => {
       }),
     };
 
+    const mockTemplateLibrary = {
+      getAllTemplates: vi.fn().mockReturnValue([{ id: "login", name: "Auth" }]),
+      getTemplateById: vi.fn().mockImplementation((id: string) =>
+        id === "login" ? { id: "login", name: "Auth" } : null,
+      ),
+    };
+
+    const mockDryRunValidator = {
+      validateProjectTests: vi.fn().mockResolvedValue({
+        isValid: true,
+        totalFiles: 4,
+        totalTests: 2,
+        errorCount: 0,
+        warningCount: 0,
+        diagnostics: [],
+        discoveredTests: [],
+        summary: "Passed",
+        validatedAt: new Date().toISOString(),
+      }),
+    };
+
     service = new ScenariosService(
       mockPrisma,
       mockPageModelService,
@@ -84,6 +105,8 @@ describe("ScenariosService", () => {
       mockTestCodeGenerator,
       mockFixtureGenerator,
       mockConfigGenerator,
+      mockTemplateLibrary as any,
+      mockDryRunValidator as any,
     );
   });
 
@@ -311,6 +334,29 @@ describe("ScenariosService", () => {
       expect(bundle.fixtures.fixtureFilePath).toBe("fixtures/index.ts");
       expect(bundle.config.filePath).toBe("playwright.config.ts");
       expect(bundle.totalFiles).toBeGreaterThanOrEqual(4);
+    });
+  });
+
+  describe("Templates & Dry-Run Validation (Tasks 2.14, 2.15)", () => {
+    it("should retrieve all built-in test templates", () => {
+      const templates = service.getTemplates();
+      expect(templates).toHaveLength(1);
+      expect(templates[0].id).toBe("login");
+    });
+
+    it("should retrieve a template by id or throw NotFoundException", () => {
+      const found = service.getTemplateById("login");
+      expect(found.id).toBe("login");
+
+      expect(() => service.getTemplateById("non-existent")).toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("should execute dry-run validation for project tests", async () => {
+      const result = await service.validateTests("proj-1");
+      expect(result.isValid).toBe(true);
+      expect(result.summary).toBe("Passed");
     });
   });
 });

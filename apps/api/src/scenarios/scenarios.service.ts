@@ -12,6 +12,8 @@ import { GeneratePlaywrightConfigDto } from "./dto/generate-config.dto";
 import { ScenarioQueryDto } from "./dto/scenario-query.dto";
 import { UpdateScenarioDto } from "./dto/update-scenario.dto";
 import { BatchApproveScenariosDto } from "./dto/batch-approve-scenarios.dto";
+import { TemplateLibraryService } from "./templates/template-library.service";
+import { DryRunValidationService } from "./dry-run-validation.service";
 import { Prisma } from "@testpilot/db";
 
 @Injectable()
@@ -26,6 +28,8 @@ export class ScenariosService {
     private readonly testCodeGenerator: TestCodeGeneratorService,
     private readonly fixtureGenerator: FixtureGeneratorService,
     private readonly configGenerator: PlaywrightConfigGeneratorService,
+    private readonly templateLibrary: TemplateLibraryService,
+    private readonly dryRunValidator: DryRunValidationService,
   ) {}
 
   // ─── Page & Project Models ──────────────────────────────────────────────────
@@ -368,5 +372,32 @@ export class ScenariosService {
       config,
       totalFiles,
     };
+  }
+
+  // ─── Task 2.14: Templates ───────────────────────────────────────────────────
+
+  getTemplates() {
+    return this.templateLibrary.getAllTemplates();
+  }
+
+  getTemplateById(id: string) {
+    const template = this.templateLibrary.getTemplateById(id);
+    if (!template) {
+      throw new NotFoundException(`Template with ID '${id}' not found`);
+    }
+    return template;
+  }
+
+  // ─── Task 2.15: Dry-Run Validation ──────────────────────────────────────────
+
+  async validateTests(
+    projectId: string,
+    options?: {
+      testFileIds?: string[];
+      includeFixtures?: boolean;
+      includeConfig?: boolean;
+    },
+  ) {
+    return await this.dryRunValidator.validateProjectTests(projectId, options);
   }
 }

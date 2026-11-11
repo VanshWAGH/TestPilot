@@ -24,6 +24,9 @@ describe("ScenariosController", () => {
       generateFixtures: vi.fn().mockResolvedValue({ fixtureFilePath: "fixtures/index.ts" }),
       generatePlaywrightConfig: vi.fn().mockResolvedValue({ filePath: "playwright.config.ts" }),
       getFullSuiteArtifacts: vi.fn().mockResolvedValue({ totalFiles: 5 }),
+      getTemplates: vi.fn().mockReturnValue([{ id: "login", name: "Auth" }]),
+      getTemplateById: vi.fn().mockReturnValue({ id: "login", name: "Auth" }),
+      validateTests: vi.fn().mockResolvedValue({ isValid: true, totalTests: 2 }),
     };
 
     controller = new ScenariosController(mockScenariosService);
@@ -165,6 +168,26 @@ describe("ScenariosController", () => {
     const res = await controller.getSuiteBundle("proj-1");
     expect(res).toEqual({ totalFiles: 5 });
     expect(mockScenariosService.getFullSuiteArtifacts).toHaveBeenCalledWith("proj-1");
+  });
+
+  it("getTemplates calls service", () => {
+    const res = controller.getTemplates();
+    expect(res).toEqual([{ id: "login", name: "Auth" }]);
+    expect(mockScenariosService.getTemplates).toHaveBeenCalled();
+  });
+
+  it("getTemplateById calls service with id", () => {
+    const res = controller.getTemplateById("login");
+    expect(res).toEqual({ id: "login", name: "Auth" });
+    expect(mockScenariosService.getTemplateById).toHaveBeenCalledWith("login");
+  });
+
+  it("dryRunTests calls service with projectId and body", async () => {
+    const res = await controller.dryRunTests("proj-1", { includeFixtures: true });
+    expect(res).toEqual({ isValid: true, totalTests: 2 });
+    expect(mockScenariosService.validateTests).toHaveBeenCalledWith("proj-1", {
+      includeFixtures: true,
+    });
   });
 });
 

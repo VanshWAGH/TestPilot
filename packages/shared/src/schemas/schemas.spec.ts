@@ -442,4 +442,51 @@ describe("Shared Schemas - Baselines & WebSocket Events", () => {
     };
     expect(RunProgressEventSchema.parse(runEvent).percentComplete).toBe(80);
   });
+
+  it("should validate test template schema and dry-run validation result schema", async () => {
+    const { TestTemplateSchema, DryRunValidationResultSchema, DryRunRequestSchema } = await import("../index");
+
+    const template = {
+      id: "login",
+      name: "Authentication & Login Flow",
+      category: "auth" as const,
+      description: "Standard login authentication flow with credential validation",
+      tags: ["auth", "login", "credentials"],
+      templateCode: "import { test, expect } from '@playwright/test';",
+      explanation: "Use for login forms",
+    };
+    const parsedTemplate = TestTemplateSchema.parse(template);
+    expect(parsedTemplate.id).toBe("login");
+    expect(parsedTemplate.category).toBe("auth");
+
+    const dryRunResult = {
+      isValid: true,
+      totalFiles: 2,
+      totalTests: 4,
+      errorCount: 0,
+      warningCount: 0,
+      diagnostics: [],
+      discoveredTests: [
+        {
+          file: "tests/auth-login.spec.ts",
+          title: "should log in successfully with valid credentials",
+          fullTitle: "SauceDemo Login > should log in successfully with valid credentials",
+          line: 12,
+          tags: ["smoke", "auth"],
+        },
+      ],
+      summary: "All 4 Playwright tests verified with 0 errors.",
+      validatedAt: new Date().toISOString(),
+    };
+    const parsedDryRun = DryRunValidationResultSchema.parse(dryRunResult);
+    expect(parsedDryRun.isValid).toBe(true);
+    expect(parsedDryRun.totalTests).toBe(4);
+
+    const request = {
+      projectId: "a0000000-0000-0000-0000-000000000001",
+      includeFixtures: true,
+      includeConfig: true,
+    };
+    expect(DryRunRequestSchema.parse(request).includeFixtures).toBe(true);
+  });
 });

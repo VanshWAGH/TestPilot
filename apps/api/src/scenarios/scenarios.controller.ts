@@ -347,4 +347,54 @@ export class ScenariosController {
   ): Promise<any> {
     return await this.scenariosService.getFullSuiteArtifacts(projectId);
   }
+
+  // ─── GET /templates (Task 2.14) ─────────────────────────────────────────────
+
+  @Get("templates")
+  @ApiOperation({
+    summary: "Get test template library (Task 2.14)",
+    description:
+      "Returns all built-in Playwright templates: login, CRUD, form validation, navigation, and API contract.",
+  })
+  @ApiResponse({ status: 200, description: "List of built-in Playwright test templates" })
+  getTemplates(): any {
+    return this.scenariosService.getTemplates();
+  }
+
+  // ─── GET /templates/:id (Task 2.14) ─────────────────────────────────────────
+
+  @Get("templates/:id")
+  @ApiOperation({
+    summary: "Get specific test template by ID (Task 2.14)",
+    description: "Returns code and metadata for a specific built-in template.",
+  })
+  @ApiParam({ name: "id", type: String, description: "Template ID (e.g. login, crud, form-validation)" })
+  @ApiResponse({ status: 200, description: "Target test template" })
+  getTemplateById(@Param("id") id: string): any {
+    return this.scenariosService.getTemplateById(id);
+  }
+
+  // ─── POST /projects/:projectId/tests/dry-run (Task 2.15) ────────────────────
+
+  @Post("projects/:projectId/tests/dry-run")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Run dry-run validation on generated tests (Task 2.15)",
+    description:
+      "Simulates tsc --noEmit and playwright test --list to verify compilation, discover test cases, and catch defects before committing.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Dry-run validation results with diagnostics and discovered tests" })
+  async dryRunTests(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body()
+    body?: {
+      testFileIds?: string[];
+      includeFixtures?: boolean;
+      includeConfig?: boolean;
+    },
+  ): Promise<any> {
+    return await this.scenariosService.validateTests(projectId, body);
+  }
 }
+
