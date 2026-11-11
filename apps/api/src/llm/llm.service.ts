@@ -80,7 +80,7 @@ export interface LlmResponse {
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
   private readonly baseUrl = "https://openrouter.ai/api/v1/chat/completions";
-  private readonly apiKey = process.env.OPENROUTER_API_KEY ?? "";
+  private currentKeyIndex = 0;
 
   // Resilience & fault-tolerance components
   private readonly circuitBreakers = new Map<string, CircuitBreaker>();
@@ -89,6 +89,39 @@ export class LlmService {
   private readonly dlq = new LlmDeadLetterQueue();
 
   constructor() {}
+
+  /**
+   * Reads configured API keys. Supports either OPENROUTER_API_KEYS or OPENROUTER_API_KEY,
+   * comma-separated for multi-key pool/rotation across multiple accounts.
+   */
+  getApiKeys(): string[] {
+    const raw =
+      process.env.OPENROUTER_API_KEYS ||
+      process.env.OPENROUTER_API_KEY ||
+      "";
+    return raw
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0 && k !== "your_openrouter_api_key_here");
+  }
+
+  getActiveApiKey(): string {
+    const keys = this.getApiKeys();
+    if (keys.length === 0) return "";
+    return keys[this.currentKeyIndex % keys.length];
+  }
+
+  rotateApiKey(): string {
+    const keys = this.getApiKeys();
+    if (keys.length <= 1) return keys[0] || "";
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % keys.length;
+    const activeKey = keys[this.currentKeyIndex];
+    const masked = activeKey.length > 8 ? `...${activeKey.slice(-6)}` : "***";
+    this.logger.warn(
+      `Rotated OpenRouter API key to #${this.currentKeyIndex + 1}/${keys.length} (${masked})`,
+    );
+    return activeKey;
+  }
 
   // ─── Circuit Breaker Registry ──────────────────────────────────────────────
 
@@ -165,7 +198,7 @@ export class LlmService {
       sessionAccumulatedTokens = 0,
     } = params;
 
-    if (!this.apiKey || this.apiKey === "your_openrouter_api_key_here") {
+    if (this.getApiKeys().length === 0) {
       throw new InternalServerErrorException(
         "OPENROUTER_API_KEY is not configured. Please set it in your .env file.",
       );
@@ -271,13 +304,14 @@ export class LlmService {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), callTimeout);
 
+          const activeApiKey = this.getActiveApiKey();
           let res: Response;
           try {
             res = await fetch(this.baseUrl, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${this.apiKey}`,
+                Authorization: `Bearer ${activeApiKey}`,
                 "HTTP-Referer": "https://testpilot.io",
                 "X-Title": "TestPilot",
               },
@@ -299,6 +333,8 @@ export class LlmService {
             if (res.status === 429) {
               isRateLimitedOverall = true;
               cb.recordFailure(new Error(`429 Rate Limit on ${model}`));
+              // Rotate to next key in key pool if available
+              this.rotateApiKey();
               // Break retry loop for this model; cascade to next model
               break;
             }

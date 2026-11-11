@@ -209,6 +209,30 @@ describe("LlmService", () => {
       expect(dlqEntries[0].error).toContain("Server error 500");
     });
 
+    it("supports multiple API keys and rotates on 429 rate limit", async () => {
+      process.env.OPENROUTER_API_KEYS = "key-alpha,key-beta";
+      expect(service.getApiKeys()).toEqual(["key-alpha", "key-beta"]);
+
+      // First call with key-alpha returns 429
+      mockFetch.mockImplementation(async (_url, opts) => {
+        const auth = opts?.headers?.Authorization;
+        if (auth === "Bearer key-alpha") {
+          return makeErrorResponse(429, "Rate limit reached on key 1");
+        }
+        return makeOkResponse("Success with second key");
+      });
+
+      const result = await service.callLlm({
+        systemPrompt: "s",
+        userPrompt: "u-multi-key",
+        models: ["model-1", "model-2"],
+        maxRetriesPerModel: 0,
+      });
+
+      expect(result.content).toBe("Success with second key");
+      delete process.env.OPENROUTER_API_KEYS;
+    });
+
     it("sets response_format json_object when expectJson=true", async () => {
       mockFetch.mockReturnValueOnce(makeOkResponse('{"key":"val"}'));
 
