@@ -71,20 +71,28 @@ export class ScenarioGeneratorService {
       testTypes,
     );
 
-    // 3. Call LLM
-    const llmOutput = await this.llm.callStructured<LlmScenariosOutput>({
-      task: "scenario_generation",
-      model,
-      systemPrompt,
-      userPrompt,
-      temperature: 0.4,
-      maxTokens: 6000,
-      expectJson: true,
-    });
+    // 3. Call LLM with graceful degradation
+    let rawScenarios: GeneratedScenario[] = [];
+    try {
+      const llmOutput = await this.llm.callStructured<LlmScenariosOutput>({
+        task: "scenario_generation",
+        model,
+        systemPrompt,
+        userPrompt,
+        temperature: 0.4,
+        maxTokens: 6000,
+        expectJson: true,
+      });
 
-    const rawScenarios: GeneratedScenario[] = Array.isArray(llmOutput?.scenarios)
-      ? llmOutput.scenarios
-      : [];
+      if (Array.isArray(llmOutput?.scenarios)) {
+        rawScenarios = llmOutput.scenarios;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `LLM scenario generation failed for page=${pageId}: ${err}. Gracefully degrading to heuristic baseline scenarios.`,
+      );
+      rawScenarios = this.generateHeuristicScenarios(pageModel, maxScenariosPerPage);
+    }
 
     if (rawScenarios.length === 0) {
       this.logger.warn(`LLM returned 0 scenarios for page=${pageId}`);
@@ -99,6 +107,148 @@ export class ScenarioGeneratorService {
     );
 
     return created;
+  }
+
+  // ─── Heuristic Baseline Scenario Generation (Graceful Fallback) ─────────────
+
+  private generateHeuristicScenarios(
+    pageModel: PageModel,
+    maxScenarios = 3,
+  ): GeneratedScenario[] {
+    const scenarios: GeneratedScenario[] = [];
+    const elements = pageModel.elements || [];
+    const pageTitle = pageModel.page.title || "Target Page";
+    const pageRoute = pageModel.page.route || "/";
+
+    // Scenario 1: Smoke Page Load & Identity Check
+    scenarios.push({
+      title: `Smoke Test: Load ${pageTitle} and verify key visual landmarks`,
+      type: "smoke",
+      riskLevel: "low",
+      preconditions: [`User has access to ${pageRoute}`],
+      steps: [
+        {
+          stepNumber: 1,
+          action: "navigate",
+          description: `Navigate to ${pageRoute}`,
+        },
+      ],
+      assertions: [
+        {
+          type: "url",
+          description: `Verify URL contains route ${pageRoute}`,
+          locator: undefined,
+          expected: pageRoute,
+        },
+        {
+          type: "visible",
+          description: "Verify main application container is visible",
+          locator: "body",
+        },
+      ],
+      testData: {},
+    });
+
+    // Scenario 2: Form/Input interaction if inputs exist
+    const inputElements = elements.filter(
+      (e) =>
+        e.elementTag === "input" ||
+        e.elementTag === "textarea" ||
+        e.elementRole === "textbox",
+    );
+    const submitBtn = elements.find(
+      (e) =>
+        e.elementTag === "button" ||
+        e.elementRole === "button" ||
+        /submit|login|continue|save|search/i.test(e.textContent || "") ||
+        /submit|login|continue|save|search/i.test(e.accessibleName || ""),
+    );
+
+    if (inputElements.length > 0 && scenarios.length < maxScenarios) {
+      const steps: GeneratedScenarioStep[] = [
+        {
+          stepNumber: 1,
+          action: "navigate",
+          description: `Navigate to ${pageRoute}`,
+        },
+      ];
+
+      inputElements.slice(0, 3).forEach((inp, idx) => {
+        const fieldName = inp.accessibleName || inp.testId || inp.elementRole || "input field";
+        const isPassword = /password/i.test(fieldName) || /password/i.test(inp.primaryLocator);
+        steps.push({
+          stepNumber: idx + 2,
+          action: "fill",
+          description: `Fill ${fieldName} with test data`,
+          locator: inp.primaryLocator || inp.domPath,
+          value: isPassword ? "secret_sauce" : "standard_user",
+        });
+      });
+
+      if (submitBtn) {
+        const btnName = submitBtn.accessibleName || submitBtn.textContent || "submit button";
+        steps.push({
+          stepNumber: steps.length + 1,
+          action: "click",
+          description: `Click ${btnName}`,
+          locator: submitBtn.primaryLocator || submitBtn.domPath,
+        });
+      }
+
+      scenarios.push({
+        title: `Functional Test: Form input submission on ${pageTitle}`,
+        type: "functional",
+        riskLevel: "medium",
+        preconditions: [`User is on ${pageRoute}`],
+        steps,
+        assertions: [
+          {
+            type: "visible",
+            description: "Verify page state remains intact after interaction",
+            locator: "body",
+          },
+        ],
+        testData: {},
+      });
+    }
+
+    // Scenario 3: Navigation click test if links exist
+    const linkElements = elements.filter(
+      (e) => e.elementTag === "a" || e.elementRole === "link",
+    );
+    if (linkElements.length > 0 && scenarios.length < maxScenarios) {
+      const primaryLink = linkElements[0];
+      const linkName = primaryLink.accessibleName || primaryLink.textContent || "link";
+      scenarios.push({
+        title: `Navigation Test: Click link to navigate from ${pageTitle}`,
+        type: "navigation",
+        riskLevel: "low",
+        preconditions: [`User is on ${pageRoute}`],
+        steps: [
+          {
+            stepNumber: 1,
+            action: "navigate",
+            description: `Navigate to ${pageRoute}`,
+          },
+          {
+            stepNumber: 2,
+            action: "click",
+            description: `Click navigation link ${linkName}`,
+            locator: primaryLink.primaryLocator || primaryLink.domPath,
+          },
+        ],
+        assertions: [
+          {
+            type: "visible",
+            description: "Verify page body is rendered after navigation",
+            locator: "body",
+          },
+        ],
+        testData: {},
+      });
+    }
+
+    return scenarios.slice(0, maxScenarios);
   }
 
   // ─── Generate scenarios for all pages of a project ───────────────────────────

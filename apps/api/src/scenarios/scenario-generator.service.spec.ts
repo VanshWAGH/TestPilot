@@ -124,6 +124,19 @@ describe("ScenarioGeneratorService", () => {
       expect(mockPrisma.scenario.create).not.toHaveBeenCalled();
     });
 
+    it("gracefully falls back to heuristic baseline scenarios when LLM throws error", async () => {
+      mockLlm.callStructured.mockRejectedValueOnce(new Error("LLM Rate Limit 429"));
+
+      const scenarios = await service.generateScenariosForPage(
+        "proj-1",
+        "page-1",
+      );
+
+      expect(scenarios.length).toBeGreaterThan(0);
+      expect(scenarios[0].type).toBe("smoke");
+      expect(mockPrisma.scenario.create).toHaveBeenCalled();
+    });
+
     it("normalizes unknown scenario types to 'functional' and invalid risk levels to 'medium'", async () => {
       mockLlm.callStructured.mockResolvedValueOnce({
         scenarios: [

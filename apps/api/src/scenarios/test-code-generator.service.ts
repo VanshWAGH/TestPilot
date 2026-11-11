@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { LlmService } from "../llm/llm.service";
 import { PageModelService } from "./page-model.service";
 import { PageObjectGeneratorService, GeneratedPageObject } from "./page-object-generator.service";
+import { TemplateLibraryService } from "./templates/template-library.service";
 import type { PageModel } from "@testpilot/shared";
 import * as crypto from "crypto";
 import * as ts from "typescript";
@@ -29,6 +30,7 @@ export class TestCodeGeneratorService {
     private readonly llm: LlmService,
     private readonly pageModelService: PageModelService,
     private readonly pageObjectGenerator: PageObjectGeneratorService,
+    private readonly templateLibrary: TemplateLibraryService,
   ) {}
 
   // ─── Generate Test Code for a Single Scenario (LLM Pass 2) ──────────────────
@@ -261,6 +263,8 @@ Source:
 \`\`\`typescript
 ${pageObject.content}
 \`\`\`
+
+${this.templateLibrary.getFewShotPrompt(scenario)}
 
 Write the full, production-ready ${scenario.title}.spec.ts test file.`;
 

@@ -135,27 +135,78 @@ describe("LlmService", () => {
     });
 
     it("throws HttpException on 429 rate limit", async () => {
-      mockFetch.mockReturnValueOnce(makeErrorResponse(429, "rate limited"));
+      mockFetch.mockImplementation(() => makeErrorResponse(429, "rate limited"));
 
       await expect(
-        service.callLlm({ systemPrompt: "s", userPrompt: "u" }),
+        service.callLlm({ systemPrompt: "s", userPrompt: "u", models: ["m1"], maxRetriesPerModel: 0 }),
       ).rejects.toThrow(HttpException);
     });
 
     it("throws InternalServerErrorException on 500 error", async () => {
-      mockFetch.mockReturnValueOnce(makeErrorResponse(500, "server error"));
+      mockFetch.mockImplementation(() => makeErrorResponse(500, "server error"));
 
       await expect(
-        service.callLlm({ systemPrompt: "s", userPrompt: "u" }),
+        service.callLlm({ systemPrompt: "s", userPrompt: "u", models: ["m1"], maxRetriesPerModel: 0 }),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
     it("throws when fetch network fails", async () => {
-      mockFetch.mockRejectedValueOnce(new Error("network down"));
+      mockFetch.mockImplementation(() => Promise.reject(new Error("network down")));
 
       await expect(
-        service.callLlm({ systemPrompt: "s", userPrompt: "u" }),
+        service.callLlm({ systemPrompt: "s", userPrompt: "u", models: ["m1"], maxRetriesPerModel: 0 }),
       ).rejects.toThrow(InternalServerErrorException);
+    });
+
+    it("automatically falls back to secondary model when primary fails with 500", async () => {
+      mockFetch
+        .mockImplementationOnce(() => makeErrorResponse(500, "server error"))
+        .mockImplementationOnce(() => makeOkResponse("Fallback succeeded", "google/gemini-2.0-flash-exp:free"));
+
+      const result = await service.callLlm({
+        systemPrompt: "s",
+        userPrompt: "prompt-fallback",
+        models: ["model-primary", "google/gemini-2.0-flash-exp:free"],
+        maxRetriesPerModel: 0,
+      });
+
+      expect(result.content).toBe("Fallback succeeded");
+      expect(result.model).toBe("google/gemini-2.0-flash-exp:free");
+    });
+
+    it("serves repeated calls from in-memory cache without repeating fetch", async () => {
+      mockFetch.mockImplementationOnce(() => makeOkResponse("Cached response"));
+
+      const res1 = await service.callLlm({
+        systemPrompt: "cache-system",
+        userPrompt: "cache-user",
+      });
+      const res2 = await service.callLlm({
+        systemPrompt: "cache-system",
+        userPrompt: "cache-user",
+      });
+
+      expect(res1.content).toBe("Cached response");
+      expect(res2.content).toBe("Cached response");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("records failure into Dead Letter Queue when all models in cascade fail", async () => {
+      mockFetch.mockImplementation(() => makeErrorResponse(500, "all down"));
+
+      await expect(
+        service.callLlm({
+          systemPrompt: "dlq-sys",
+          userPrompt: "dlq-usr",
+          models: ["failed-model"],
+          maxRetriesPerModel: 0,
+        }),
+      ).rejects.toThrow(InternalServerErrorException);
+
+      const dlqEntries = service.getDeadLetterEntries();
+      expect(dlqEntries.length).toBeGreaterThan(0);
+      expect(dlqEntries[0].modelsAttempted).toContain("failed-model");
+      expect(dlqEntries[0].error).toContain("Server error 500");
     });
 
     it("sets response_format json_object when expectJson=true", async () => {
@@ -163,7 +214,7 @@ describe("LlmService", () => {
 
       await service.callLlm({
         systemPrompt: "s",
-        userPrompt: "u",
+        userPrompt: "u-json",
         expectJson: true,
       });
 

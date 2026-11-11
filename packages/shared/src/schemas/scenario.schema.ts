@@ -163,4 +163,60 @@ export const TestSuiteBundleResponseSchema = z.object({
 });
 export type TestSuiteBundleResponse = z.infer<typeof TestSuiteBundleResponseSchema>;
 
+// ─── Task 2.14: Template Library Schemas ─────────────────────────────────────
+
+export const TestTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.enum(["auth", "crud", "form", "navigation", "api"]),
+  description: z.string(),
+  tags: z.array(z.string()),
+  templateCode: z.string(),
+  explanation: z.string(),
+});
+export type TestTemplate = z.infer<typeof TestTemplateSchema>;
+
+// ─── Task 2.15: Dry-Run Validation Schemas ───────────────────────────────────
+
+export const DryRunDiagnosticSchema = z.object({
+  file: z.string(),
+  line: z.number().int().nonnegative(),
+  column: z.number().int().nonnegative(),
+  severity: z.enum(["error", "warning", "info"]),
+  message: z.string(),
+  code: z.string().optional(),
+});
+export type DryRunDiagnostic = z.infer<typeof DryRunDiagnosticSchema>;
+
+export const DiscoveredTestCaseSchema = z.object({
+  file: z.string(),
+  title: z.string(),
+  fullTitle: z.string(),
+  line: z.number().int().nonnegative(),
+  tags: z.array(z.string()).default([]),
+});
+export type DiscoveredTestCase = z.infer<typeof DiscoveredTestCaseSchema>;
+
+export const DryRunValidationResultSchema = z.object({
+  isValid: z.boolean(),
+  totalFiles: z.number().int().nonnegative(),
+  totalTests: z.number().int().nonnegative(),
+  errorCount: z.number().int().nonnegative(),
+  warningCount: z.number().int().nonnegative(),
+  diagnostics: z.array(DryRunDiagnosticSchema),
+  discoveredTests: z.array(DiscoveredTestCaseSchema),
+  summary: z.string(),
+  validatedAt: z.string().datetime(),
+});
+export type DryRunValidationResult = z.infer<typeof DryRunValidationResultSchema>;
+
+export const DryRunRequestSchema = z.object({
+  projectId: z.string().uuid(),
+  testFileIds: z.array(z.string().uuid()).optional(),
+  includeFixtures: z.boolean().default(true),
+  includeConfig: z.boolean().default(true),
+});
+export type DryRunRequest = z.infer<typeof DryRunRequestSchema>;
+
+
 

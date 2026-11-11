@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TestCodeGeneratorService } from "./test-code-generator.service";
 import { PageObjectGeneratorService } from "./page-object-generator.service";
+import { TemplateLibraryService } from "./templates/template-library.service";
 import { NotFoundException } from "@nestjs/common";
 
 describe("TestCodeGeneratorService", () => {
@@ -9,6 +10,7 @@ describe("TestCodeGeneratorService", () => {
   let mockLlm: any;
   let mockPageModelService: any;
   let pageObjectGenerator: PageObjectGeneratorService;
+  let templateLibrary: TemplateLibraryService;
 
   beforeEach(() => {
     mockPrisma = {
@@ -54,12 +56,14 @@ describe("TestCodeGeneratorService", () => {
     };
 
     pageObjectGenerator = new PageObjectGeneratorService();
+    templateLibrary = new TemplateLibraryService();
 
     service = new TestCodeGeneratorService(
       mockPrisma,
       mockLlm,
       mockPageModelService,
       pageObjectGenerator,
+      templateLibrary,
     );
   });
 
