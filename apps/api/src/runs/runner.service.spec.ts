@@ -1,6 +1,8 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Test, TestingModule } from "@nestjs/testing";
 import { RunnerService } from "./runner.service";
+import { ResultImportService } from "./result-import.service";
+import { ArtifactImportService } from "./artifact-import.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 
@@ -20,6 +22,16 @@ const mockPrisma = {
     findMany: vi.fn(),
     count: vi.fn(),
   },
+};
+
+const mockResultImportService = {
+  importResults: vi.fn(),
+};
+
+const mockArtifactImportService = {
+  downloadArtifactBuffer: vi.fn(),
+  downloadAndImportFromGha: vi.fn(),
+  importFromZipBuffer: vi.fn(),
 };
 
 // ─── Octokit Mock ─────────────────────────────────────────────────────────────
@@ -78,6 +90,8 @@ describe("RunnerService", () => {
       providers: [
         RunnerService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: ResultImportService, useValue: mockResultImportService },
+        { provide: ArtifactImportService, useValue: mockArtifactImportService },
       ],
     }).compile();
 

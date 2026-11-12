@@ -109,5 +109,48 @@ export class RunnerController {
   ) {
     return this.runnerService.cancelRun(projectId, runId);
   }
+
+  /**
+   * POST /projects/:projectId/runs/:runId/import-results
+   * Task 3.3 — Parse and import Playwright JSON reporter output into TestRun results.
+   */
+  @Post("projects/:projectId/runs/:runId/import-results")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Import Playwright JSON test results (Task 3.3)",
+    description: "Parses Playwright JSON reporter output, maps to scenarios and test files, and persists TestResult records.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "runId", type: String, description: "UUID of the test run" })
+  @ApiResponse({ status: 200, description: "Results imported summary" })
+  @ApiResponse({ status: 404, description: "Test run not found" })
+  async importResults(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("runId", ParseUUIDPipe) runId: string,
+    @Body() body: { report: any },
+  ) {
+    return this.runnerService.importResults(runId, body.report ?? body);
+  }
+
+  /**
+   * POST /projects/:projectId/runs/:runId/sync-artifacts
+   * Task 3.4 — Re-sync artifacts from GitHub Actions for a completed run.
+   */
+  @Post("projects/:projectId/runs/:runId/sync-artifacts")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Sync artifacts from GitHub Actions (Task 3.4)",
+    description: "Downloads artifacts from GitHub Actions, uploads to storage, and links traces/videos/screenshots to test results.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "runId", type: String, description: "UUID of the test run" })
+  @ApiResponse({ status: 200, description: "Sync triggered" })
+  @ApiResponse({ status: 404, description: "Test run not found" })
+  async syncArtifacts(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("runId", ParseUUIDPipe) runId: string,
+  ) {
+    return this.runnerService.syncArtifactsFromGha(projectId, runId);
+  }
 }
 

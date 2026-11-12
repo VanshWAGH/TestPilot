@@ -5,9 +5,12 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { ResultImportService, PlaywrightJsonReport } from "./result-import.service";
+import { ArtifactImportService } from "./artifact-import.service";
 import { TriggerRunDto } from "./dto/trigger-run.dto";
 import { ListRunsDto } from "./dto/list-runs.dto";
 import { Octokit } from "@octokit/rest";
+import AdmZip from "adm-zip";
 
 // ─── Workflow Dispatch Response ───────────────────────────────────────────────
 
@@ -32,7 +35,11 @@ export class RunnerService {
   // Hook for testing — replace octokit in tests
   public octokitOverride?: Octokit;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly resultImportService: ResultImportService,
+    private readonly artifactImportService: ArtifactImportService,
+  ) {}
 
   // ─── Instantiate Octokit ──────────────────────────────────────────────────
 
@@ -307,13 +314,13 @@ export class RunnerService {
     }).catch(() => {});
   }
 
-  // ─── Task 3.2d — Download artifacts metadata (placeholder for 3.4) ───────
+  // ─── Task 3.3 & 3.4 — Download & Import Results + Artifacts ──────────────
 
   /**
-   * Downloads artifact listing from the completed GHA run and stores artifact
-   * download URLs on the TestRun for later processing in Task 3.4.
+   * Downloads JSON test results and artifact bundle from the completed GHA run,
+   * stores test results in DB, and uploads media artifacts to storage.
    */
-  private async downloadAndLinkArtifacts(
+  public async downloadAndLinkArtifacts(
     testRunId: string,
     owner: string,
     repo: string,
@@ -342,22 +349,96 @@ export class RunnerService {
       `Found ${data.total_count} artifacts for TestRun ${testRunId}: report=${reportArtifact?.name}, json=${jsonArtifact?.name}`,
     );
 
-    // Store report URL on TestRun (artifact download URL for HTML report)
-    if (reportArtifact) {
-      await this.prisma.testRun.update({
-        where: { id: testRunId },
-        data: {
-          reportUrl: `https://github.com/${owner}/${repo}/actions/runs/${runId}`,
-        },
-      }).catch(() => {});
+    // 1. Task 3.3 — Import Playwright JSON test results
+    if (jsonArtifact) {
+      try {
+        const jsonZip = await this.artifactImportService.downloadArtifactBuffer(
+          owner,
+          repo,
+          jsonArtifact.id,
+          octokit,
+        );
+        const zip = new AdmZip(jsonZip);
+        const jsonEntry = zip.getEntries().find((e) => e.entryName.endsWith(".json"));
+        if (jsonEntry) {
+          const jsonText = jsonEntry.getData().toString("utf8");
+          await this.resultImportService.importResults(testRunId, jsonText);
+          this.logger.log(`Successfully imported JSON test results for TestRun ${testRunId}`);
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to import JSON results for TestRun ${testRunId}: ${err.message}`,
+        );
+      }
     }
 
-    // The JSON results artifact will be processed by Task 3.3 (ResultImportService)
-    if (jsonArtifact) {
-      this.logger.log(
-        `JSON artifact available for import: ${jsonArtifact.name} (id: ${jsonArtifact.id}) — will be processed by ResultImportService`,
-      );
+    // 2. Task 3.4 — Import media & trace artifacts into Storage
+    if (reportArtifact) {
+      try {
+        await this.artifactImportService.downloadAndImportFromGha(
+          testRunId,
+          owner,
+          repo,
+          runId,
+          octokit,
+        );
+        this.logger.log(`Successfully imported media artifacts for TestRun ${testRunId}`);
+      } catch (err: any) {
+        this.logger.warn(
+          `Failed to import artifacts for TestRun ${testRunId}: ${err.message}`,
+        );
+      }
     }
+  }
+
+  /**
+   * Manually imports Playwright JSON results from payload into a TestRun.
+   */
+  async importResults(
+    testRunId: string,
+    report: string | PlaywrightJsonReport,
+  ) {
+    return await this.resultImportService.importResults(testRunId, report);
+  }
+
+  /**
+   * Manually imports artifact ZIP buffer into Storage and links to TestResults.
+   */
+  async importArtifacts(
+    testRunId: string,
+    zipBuffer: Buffer,
+  ) {
+    return await this.artifactImportService.importFromZipBuffer(testRunId, zipBuffer);
+  }
+
+  /**
+   * Triggers re-sync of artifacts from GitHub Actions for a given run.
+   */
+  async syncArtifactsFromGha(projectId: string, runId: string) {
+    const run = await this.prisma.testRun.findFirst({
+      where: { id: runId, projectId },
+    });
+    if (!run) throw new NotFoundException(`TestRun ${runId} not found`);
+    if (!run.githubWorkflowRunId) {
+      throw new BadRequestException(`TestRun ${runId} has no linked GitHub Actions workflow run`);
+    }
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project?.githubTestRepo) {
+      throw new BadRequestException(`Project has no connected GitHub repository`);
+    }
+
+    const [owner, repo] = project.githubTestRepo.split("/");
+    await this.downloadAndLinkArtifacts(
+      run.id,
+      owner,
+      repo,
+      Number(run.githubWorkflowRunId),
+    );
+
+    return { success: true, testRunId: runId };
   }
 
   // ─── Task 3.2e — Get run status ───────────────────────────────────────────
