@@ -11,6 +11,7 @@ import { CrawlerModule } from "./crawler/crawler.module";
 import { LlmModule } from "./llm/llm.module";
 import { ScenariosModule } from "./scenarios/scenarios.module";
 import { GitHubModule } from "./github/github.module";
+import { RunsModule } from "./runs/runs.module";
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { GitHubModule } from "./github/github.module";
     LlmModule,
     ScenariosModule,
     GitHubModule,
+    RunsModule,
   ],
 })
 export class AppModule {}
