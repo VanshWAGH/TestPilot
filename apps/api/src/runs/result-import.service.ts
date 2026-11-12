@@ -343,3 +343,4 @@ export class ResultImportService {
     return { testFileId: null, scenarioId: null };
   }
 }
+
