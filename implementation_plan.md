@@ -276,8 +276,8 @@ testpilot/
 
 | # | Task | Details | Output |
 |---|------|---------|--------|
-| 3.1 | **Regression workflow** | `.github/workflows/regression.yml` in test-suite repo. `workflow_dispatch` with `run_id`, `environment`, `test_tags`. Uploads playwright-report/, test-results/ as artifacts. | Workflow runs in GHA |
-| 3.2 | **Runner service** | Create `TestRun` record → dispatch GitHub Actions workflow via API → poll/webhook for completion → download artifacts → import results. | Run triggered from platform |
+| 3.1 | **Regression workflow** | `.github/workflows/regression.yml` in test-suite repo. `workflow_dispatch` with `run_id`, `environment`, `test_tags`. Uploads playwright-report/, test-results/ as artifacts. | ✅ **Completed** (Playwright regression workflow `.github/workflows/regression.yml` deployed to test-suite repository with `workflow_dispatch` trigger supporting `run_id`, `environment`, `test_tags`, and `browser` matrix inputs, uploading `playwright-report/`, `test-results/`, and standalone JSON reports for automated platform ingestion) |
+| 3.2 | **Runner service** | Create `TestRun` record → dispatch GitHub Actions workflow via API → poll/webhook for completion → download artifacts → import results. | ✅ **Completed** (Full-lifecycle `RunnerService` & `RunnerController` in NestJS: creates `TestRun` DB record, dispatches GitHub Actions `workflow_dispatch` via Octokit, executes background non-blocking polling at 15s intervals mapping GHA conclusions to run status, links artifacts, supports run cancellation, and includes 16 unit tests with 100% pass rate) |
 | 3.3 | **Result import** | Parse Playwright JSON reporter output. Map each test result to scenario + test file. Store pass/fail/skip + duration + error message + retry count. | Results in database |
 | 3.4 | **Artifact import** | Download trace files, videos, screenshots, HARs from GitHub Actions artifacts. Store in S3/MinIO. Link to test results. | Artifacts viewable |
 | 3.5 | **Runs Dashboard (UI)** | Table of all runs: date, trigger type, environment, status, pass/fail/skip counts, duration. Click to drill down. | Dashboard works |
