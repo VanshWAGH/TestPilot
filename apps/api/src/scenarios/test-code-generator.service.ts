@@ -415,7 +415,14 @@ ${assertionCodeBlocks || "    // No assertions defined"}
 
   private cleanCodeOutput(raw: string): string {
     let cleaned = raw.trim();
-    // Strip markdown code block wrappers
+
+    // Check if there is a ```typescript or ```ts or ``` code block anywhere in the output
+    const codeBlockMatch = cleaned.match(/```(?:typescript|ts)?\s*\n([\s\S]*?)\n```/);
+    if (codeBlockMatch) {
+      return codeBlockMatch[1].trim();
+    }
+
+    // Strip leading ``` if present at the top
     if (cleaned.startsWith("```typescript")) {
       cleaned = cleaned.replace(/^```typescript\s*\n/, "");
     } else if (cleaned.startsWith("```ts")) {

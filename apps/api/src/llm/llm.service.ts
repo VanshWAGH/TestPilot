@@ -18,32 +18,57 @@ export type LlmTaskType =
 
 /**
  * Task-specific free-tier model cascades for OpenRouter.
- * Pass 1: Scenario generation requires strong QA reasoning and large context
- * Pass 2: Code generation requires strong coding and Playwright TypeScript syntax understanding
- * Pass 4: Self-healing requires analyzing large DOM fragments and selector matching
+ * Updated 2026-11-11 — only models currently available as :free on OpenRouter.
+ *
+ * Pass 1: Scenario generation — needs strong reasoning + large context
+ * Pass 2: Code generation — needs coding ability (Playwright TypeScript)
+ * Pass 4: Self-healing — needs large-context DOM analysis
+ *
+ * Cascade order: best quality first → lighter fallbacks.
+ * All entries verified against GET https://openrouter.ai/api/v1/models.
  */
 export const TASK_MODEL_REGISTRY: Record<LlmTaskType, string[]> = {
   scenario_generation: [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
-    "deepseek/deepseek-chat:free",
-    "mistralai/mistral-small-24b-instruct-2501:free",
+    // 1M context, 550B flagship model — best reasoning for QA flow analysis
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    // 1M context, lightning fast
+    "nvidia/nemotron-3.5-lightning:free",
+    // 1M context, reliable fallback
+    "baidu/ernie-5.5-flash-preview:free",
+    // 256K context, strong reasoning
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    // Google Gemma 4 31B (when available)
+    "google/gemma-4-31b-it:free",
   ],
   code_generation: [
-    "qwen/qwen-2.5-coder-32b-instruct:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
-    "deepseek/deepseek-chat:free",
+    // 1M context, 550B flagship model — tested <1s latency & perfect TypeScript output
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    // 1M context, lightning fast code generation
+    "nvidia/nemotron-3.5-lightning:free",
+    // 1M context fallback
+    "baidu/ernie-5.5-flash-preview:free",
+    // 256K context specialized code model fallback
+    "cohere/north-mini-code:free",
   ],
   healing: [
-    "google/gemini-2.0-flash-exp:free",
-    "qwen/qwen-2.5-coder-32b-instruct:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
+    // Large-context DOM analysis needs 1M+ window
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    // 256K — Nemotron reasoning for diff and selector matching
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    // 1M context alternative
+    "nvidia/nemotron-3.5-lightning:free",
+    // 1M context fallback
+    "baidu/ernie-5.5-flash-preview:free",
   ],
   general: [
-    "google/gemini-2.0-flash-exp:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-small-24b-instruct-2501:free",
+    // 1M context flagship
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    // Fast 1M context model
+    "nvidia/nemotron-3.5-lightning:free",
+    // 1M context fallback
+    "baidu/ernie-5.5-flash-preview:free",
+    // Fast 262K context fallback
+    "liquid/lfm-3-1.7b:free",
   ],
 };
 
@@ -363,7 +388,11 @@ export class LlmService {
             throw new InternalServerErrorException("LLM returned no choices.");
           }
 
-          const content = choices[0].message.content ?? "";
+          const messageObj = choices[0].message as {
+            content?: string | null;
+            reasoning?: string | null;
+          };
+          const content = messageObj.content ?? messageObj.reasoning ?? "";
           const usage = json.usage as {
             prompt_tokens?: number;
             completion_tokens?: number;
@@ -438,18 +467,53 @@ export class LlmService {
   async callStructured<T>(params: LlmCallParams): Promise<T> {
     const response = await this.callLlm({ ...params, expectJson: true });
 
-    let parsed: T;
+    let raw = (response.content || "").trim();
+
+    // 1. Strip markdown code fences if wrapped (e.g. ```json ... ```)
+    if (raw.startsWith("```")) {
+      raw = raw
+        .replace(/^```(?:json)?\s*\n?/i, "")
+        .replace(/\n?```\s*$/i, "")
+        .trim();
+    }
+
+    // 2. Direct JSON parse
     try {
-      parsed = JSON.parse(response.content) as T;
+      return JSON.parse(raw) as T;
     } catch {
+      // 3. Fallback: extract substring between first { or [ and last } or ]
+      const firstBrace = raw.indexOf("{");
+      const firstBracket = raw.indexOf("[");
+      let startIndex = -1;
+      let isObject = true;
+
+      if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+        startIndex = firstBrace;
+        isObject = true;
+      } else if (firstBracket !== -1) {
+        startIndex = firstBracket;
+        isObject = false;
+      }
+
+      if (startIndex !== -1) {
+        const lastChar = isObject ? "}" : "]";
+        const endIndex = raw.lastIndexOf(lastChar);
+        if (endIndex > startIndex) {
+          try {
+            const extracted = raw.slice(startIndex, endIndex + 1);
+            return JSON.parse(extracted) as T;
+          } catch {
+            // fall through to error
+          }
+        }
+      }
+
       this.logger.error(
-        `LLM returned non-JSON content: ${response.content.slice(0, 500)}`,
+        `LLM returned non-JSON content: ${raw.slice(0, 500)}`,
       );
       throw new InternalServerErrorException(
         "LLM did not return valid JSON despite json_object response format.",
       );
     }
-
-    return parsed;
   }
 }

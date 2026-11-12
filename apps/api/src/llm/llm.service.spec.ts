@@ -61,7 +61,7 @@ describe("LlmService", () => {
         userPrompt: "u",
       });
 
-      expect(models[0]).toBe("meta-llama/llama-3.3-70b-instruct:free");
+      expect(models[0]).toBe(TASK_MODEL_REGISTRY.scenario_generation[0]);
       expect(models).toEqual(TASK_MODEL_REGISTRY.scenario_generation);
     });
 
@@ -72,7 +72,7 @@ describe("LlmService", () => {
         userPrompt: "u",
       });
 
-      expect(models[0]).toBe("qwen/qwen-2.5-coder-32b-instruct:free");
+      expect(models[0]).toBe(TASK_MODEL_REGISTRY.code_generation[0]);
       expect(models).toEqual(TASK_MODEL_REGISTRY.code_generation);
     });
 
@@ -85,8 +85,8 @@ describe("LlmService", () => {
       });
 
       expect(models[0]).toBe("custom/my-model");
-      expect(models).toContain("meta-llama/llama-3.3-70b-instruct:free");
-      expect(models).toContain("google/gemini-2.0-flash-exp:free");
+      expect(models).toContain(TASK_MODEL_REGISTRY.scenario_generation[0]);
+      expect(models).toContain(TASK_MODEL_REGISTRY.scenario_generation[1]);
     });
 
     it("respects explicit models array when provided", () => {
@@ -119,7 +119,7 @@ describe("LlmService", () => {
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body as string);
       expect(sentBody.models).toEqual(TASK_MODEL_REGISTRY.scenario_generation);
-      expect(sentBody.model).toBe("meta-llama/llama-3.3-70b-instruct:free");
+      expect(sentBody.model).toBe(TASK_MODEL_REGISTRY.scenario_generation[0]);
     });
 
     it("throws when API key is missing", async () => {
