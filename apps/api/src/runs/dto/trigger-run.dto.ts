@@ -48,3 +48,4 @@ export class TriggerRunDto {
   @IsEnum(["manual", "schedule", "webhook"])
   triggerType?: string;
 }
+
