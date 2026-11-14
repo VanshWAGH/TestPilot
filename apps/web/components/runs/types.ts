@@ -51,3 +51,14 @@ export interface RunDetail extends RunListItem {
   results?: TestResultItem[];
 }
 
+export interface FlakyTestItem {
+  testName: string;
+  testFileId?: string | null;
+  scenarioId?: string | null;
+  flakyOccurrences: number;
+  totalRuns: number;
+  flakinessScore: number;
+  lastFlakyRunId: string;
+  lastFlakyAt: string;
+}
+

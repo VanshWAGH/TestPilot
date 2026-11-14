@@ -4,6 +4,7 @@ import {
   TriggerRunSchema,
   TestResultResponseSchema,
   TestTrendResponseSchema,
+  FlakyTestResponseSchema,
 } from "@testpilot/shared";
 
 describe("Test Runs Dashboard & Trend UI Helpers", () => {
@@ -84,4 +85,54 @@ describe("Test Runs Dashboard & Trend UI Helpers", () => {
     expect(parsed.passedRate).toBe(83.3);
     expect(parsed.failedRate).toBe(16.7);
   });
+
+  it("validates FlakyTestResponseSchema for flaky test card (Task 3.7)", () => {
+    const flakyItem = {
+      testName: "Checkout postal code validation",
+      testFileId: "123e4567-e89b-12d3-a456-426614174000",
+      flakyOccurrences: 4,
+      totalRuns: 10,
+      flakinessScore: 0.4,
+      lastFlakyRunId: "123e4567-e89b-12d3-a456-426614174001",
+      lastFlakyAt: new Date().toISOString(),
+    };
+
+    const parsed = FlakyTestResponseSchema.parse(flakyItem);
+    expect(parsed.testName).toBe("Checkout postal code validation");
+    expect(parsed.flakyOccurrences).toBe(4);
+    expect(parsed.flakinessScore).toBe(0.4);
+    expect(parsed.totalRuns).toBe(10);
+  });
+
+  it("validates full failure detail artifacts representation (Task 3.8)", () => {
+    const detailedResult = {
+      id: "123e4567-e89b-12d3-a456-426614174099",
+      testRunId: "123e4567-e89b-12d3-a456-426614174000",
+      testName: "Add Sauce Labs Backpack to Shopping Cart",
+      status: "failed" as const,
+      durationMs: 8450,
+      failureCategory: "test_issue" as const,
+      failureClassificationReason: "Selector button[data-test='add-to-cart'] not found; locator candidate available",
+      errorMessage: "Timed out 5000ms waiting for locator('button[data-test=\"add-to-cart\"]')",
+      stackTrace: "Error: Timed out\n    at InventoryPage.addToCart (inventory.page.ts:24:12)",
+      failedStepNumber: 2,
+      failedLocator: "button[data-test='add-to-cart']",
+      artifacts: {
+        traceUrl: "https://minio.testpilot.local/artifacts/traces/run-1.zip",
+        videoUrl: "https://minio.testpilot.local/artifacts/videos/run-1.webm",
+        screenshotUrl: "https://minio.testpilot.local/artifacts/screenshots/fail-1.png",
+        harUrl: "https://minio.testpilot.local/artifacts/har/run-1.har",
+        errorLog: "Browser console: [404] /api/inventory/items",
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    const parsed = TestResultResponseSchema.parse(detailedResult);
+    expect(parsed.failureCategory).toBe("test_issue");
+    expect(parsed.artifacts?.traceUrl).toBeDefined();
+    expect(parsed.artifacts?.videoUrl).toBeDefined();
+    expect(parsed.artifacts?.screenshotUrl).toBeDefined();
+    expect(parsed.artifacts?.harUrl).toBeDefined();
+  });
 });
+

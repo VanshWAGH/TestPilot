@@ -117,3 +117,4 @@ export function TrendChart({ data }: TrendChartProps) {
     </div>
   );
 }
+

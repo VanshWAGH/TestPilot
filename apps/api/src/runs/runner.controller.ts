@@ -71,6 +71,26 @@ export class RunnerController {
   }
 
   /**
+   * GET /projects/:projectId/runs/flaky-tests
+   * Task 3.7 — Retrieve flaky test analysis for a project.
+   */
+  @Get("projects/:projectId/runs/flaky-tests")
+  @ApiOperation({
+    summary: "Detect flaky tests across test history (Task 3.7)",
+    description:
+      "Analyzes pass/fail alternations across recent test runs without code changes and computes flakiness scores.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "List of identified flaky tests" })
+  async getFlakyTests(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Query("window") window?: string,
+  ) {
+    const windowSize = window ? parseInt(window, 10) : 20;
+    return this.runnerService.getFlakyTests(projectId, isNaN(windowSize) ? 20 : windowSize);
+  }
+
+  /**
    * GET /projects/:projectId/runs/:runId
    * Get status and details of a specific test run.
    */
@@ -86,7 +106,7 @@ export class RunnerController {
   async getRunStatus(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("runId", ParseUUIDPipe) runId: string,
-  ) {
+  ): Promise<any> {
     return this.runnerService.getRunStatus(projectId, runId);
   }
 

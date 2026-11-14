@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, BadRequestException, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { FlakyDetectionService } from "./flaky-detection.service";
 
 // ─── Playwright JSON Reporter Types ───────────────────────────────────────────
 
@@ -89,7 +90,10 @@ interface FlattenedSpec {
 export class ResultImportService {
   private readonly logger = new Logger(ResultImportService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
+  ) {}
 
   /**
    * Import Playwright JSON reporter output from a raw string or parsed object
@@ -239,6 +243,17 @@ export class ResultImportService {
         completedAt: testRun.completedAt ?? new Date(),
       },
     });
+
+    // 6. Task 3.7 — Automatically analyze and update flaky scores across test run history
+    if (this.flakyDetectionService) {
+      try {
+        await this.flakyDetectionService.updateRunFlakyScores(testRunId);
+      } catch (err: any) {
+        this.logger.warn(
+          `Flaky test score calculation failed for TestRun ${testRunId}: ${err.message}`,
+        );
+      }
+    }
 
     this.logger.log(
       `Imported results for TestRun ${testRunId}: total=${totalTests}, passed=${passedCount}, failed=${failedCount}, flaky=${flakyCount}, status=${finalRunStatus}`,

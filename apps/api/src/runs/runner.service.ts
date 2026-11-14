@@ -3,10 +3,12 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ResultImportService, PlaywrightJsonReport } from "./result-import.service";
 import { ArtifactImportService } from "./artifact-import.service";
+import { FlakyDetectionService } from "./flaky-detection.service";
 import { TriggerRunDto } from "./dto/trigger-run.dto";
 import { ListRunsDto } from "./dto/list-runs.dto";
 import { Octokit } from "@octokit/rest";
@@ -39,6 +41,7 @@ export class RunnerService {
     private readonly prisma: PrismaService,
     private readonly resultImportService: ResultImportService,
     private readonly artifactImportService: ArtifactImportService,
+    @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
   ) {}
 
   // ─── Instantiate Octokit ──────────────────────────────────────────────────
@@ -441,9 +444,18 @@ export class RunnerService {
     return { success: true, testRunId: runId };
   }
 
+  // ─── Task 3.7 — Flaky tests analysis ──────────────────────────────────────
+
+  async getFlakyTests(projectId: string, windowSize: number = 20) {
+    if (!this.flakyDetectionService) {
+      return [];
+    }
+    return this.flakyDetectionService.detectFlakyTests(projectId, windowSize);
+  }
+
   // ─── Task 3.2e — Get run status ───────────────────────────────────────────
 
-  async getRunStatus(projectId: string, runId: string) {
+  async getRunStatus(projectId: string, runId: string): Promise<any> {
     const run = await this.prisma.testRun.findFirst({
       where: { id: runId, projectId },
       include: {
@@ -455,6 +467,34 @@ export class RunnerService {
             durationMs: true,
             errorMessage: true,
             retryCount: true,
+            flakyScore: true,
+            traceUrl: true,
+            videoUrl: true,
+            screenshotUrls: true,
+            harUrl: true,
+            consoleErrors: true,
+            scenario: {
+              select: {
+                id: true,
+                title: true,
+                type: true,
+                riskLevel: true,
+              },
+            },
+            testFile: {
+              select: {
+                id: true,
+                filePath: true,
+              },
+            },
+            healingProposals: {
+              select: {
+                id: true,
+                status: true,
+                confidenceScore: true,
+                selectedLocator: true,
+              },
+            },
           },
         },
       },
