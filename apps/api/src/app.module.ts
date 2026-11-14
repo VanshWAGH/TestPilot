@@ -12,6 +12,7 @@ import { LlmModule } from "./llm/llm.module";
 import { ScenariosModule } from "./scenarios/scenarios.module";
 import { GitHubModule } from "./github/github.module";
 import { RunsModule } from "./runs/runs.module";
+import { BaselinesModule } from "./baselines/baselines.module";
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { RunsModule } from "./runs/runs.module";
     ScenariosModule,
     GitHubModule,
     RunsModule,
+    BaselinesModule,
   ],
 })
 export class AppModule {}

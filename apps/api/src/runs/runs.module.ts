@@ -6,9 +6,10 @@ import { ArtifactImportService } from "./artifact-import.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
 import { AuthModule } from "../auth/auth.module";
 import { StorageModule } from "../storage/storage.module";
+import { BaselinesModule } from "../baselines/baselines.module";
 
 @Module({
-  imports: [AuthModule, StorageModule],
+  imports: [AuthModule, StorageModule, BaselinesModule],
   controllers: [RunnerController],
   providers: [
     RunnerService,

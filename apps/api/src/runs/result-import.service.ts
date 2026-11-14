@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
+import { DiffEngineService } from "../baselines/diff-engine.service";
 
 // ─── Playwright JSON Reporter Types ───────────────────────────────────────────
 
@@ -93,6 +94,7 @@ export class ResultImportService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
+    @Optional() private readonly diffEngineService?: DiffEngineService,
   ) {}
 
   /**
@@ -251,6 +253,24 @@ export class ResultImportService {
       } catch (err: any) {
         this.logger.warn(
           `Flaky test score calculation failed for TestRun ${testRunId}: ${err.message}`,
+        );
+      }
+    }
+
+    // 7. Task 3.9 & 3.10 — Automatically compute DOM & visual diffs against active baselines
+    if (this.diffEngineService) {
+      try {
+        const pagesWithBaselines = await this.prisma.pageBaseline.findMany({
+          where: { projectId: testRun.projectId, status: "active" },
+          select: { pageId: true },
+        });
+
+        for (const { pageId } of pagesWithBaselines) {
+          await this.diffEngineService.computeAndSaveDiffs(testRunId, pageId, {});
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `Diff generation failed for TestRun ${testRunId}: ${err.message}`,
         );
       }
     }
