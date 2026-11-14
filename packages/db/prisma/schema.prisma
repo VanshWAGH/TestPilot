@@ -77,6 +77,7 @@ model Project {
   testRuns         TestRun[]
   healingProposals HealingProposal[]
   defects          Defect[]
+  baselines        PageBaseline[]
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
 
@@ -152,6 +153,9 @@ model Page {
   elements                 PageElement[]
   snapshots                PageSnapshot[]
   scenarios                Scenario[]
+  baselines                PageBaseline[]
+  domDiffs                 DomDiff[]
+  visualDiffs              VisualDiff[]
   createdAt                DateTime       @default(now()) @map("created_at")
 
   @@index([projectId])
@@ -175,6 +179,7 @@ model PageElement {
   domPath           String            @map("dom_path")
   boundingBox       Json?             @map("bounding_box")
   healingProposals  HealingProposal[]
+  visualDiffs       VisualDiff[]
   createdAt         DateTime          @default(now()) @map("created_at")
 
   @@index([pageId])
@@ -194,6 +199,7 @@ model PageSnapshot {
   harUrl                 String?   @map("har_url")
   consoleLogs            Json?     @map("console_logs")
   routeGraph             Json?     @map("route_graph")
+  baselines              PageBaseline[]
   createdAt              DateTime  @default(now()) @map("created_at")
 
   @@index([pageId])
@@ -267,6 +273,8 @@ model TestRun {
   startedAt            DateTime?     @map("started_at")
   completedAt          DateTime?     @map("completed_at")
   results              TestResult[]
+  domDiffs             DomDiff[]
+  visualDiffs          VisualDiff[]
   createdAt            DateTime      @default(now()) @map("created_at")
 
   @@index([projectId])
@@ -368,4 +376,72 @@ model GitHubInstallation {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("github_installations")
+}
+
+model PageBaseline {
+  id                    String        @id @default(uuid())
+  projectId             String        @map("project_id")
+  project               Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pageId                String        @map("page_id")
+  page                  Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  snapshotId            String?       @map("snapshot_id")
+  snapshot              PageSnapshot? @relation(fields: [snapshotId], references: [id])
+  url                   String
+  domFingerprint        String        @map("dom_fingerprint")
+  domJson               Json?         @map("dom_json")
+  accessibilityTreeJson Json?         @map("accessibility_tree_json")
+  screenshotUrl         String?       @map("screenshot_url")
+  status                String        @default("active") // active, deprecated, superseded
+  approvedBy            String?       @map("approved_by")
+  approvedAt            DateTime?     @map("approved_at")
+  domDiffs              DomDiff[]
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([pageId])
+  @@index([pageId, status])
+  @@map("page_baselines")
+}
+
+model DomDiff {
+  id              String       @id @default(uuid())
+  pageId          String       @map("page_id")
+  page            Page         @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  testRunId       String       @map("test_run_id")
+  testRun         TestRun      @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  baselineId      String       @map("baseline_id")
+  baseline        PageBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+  elementsAdded   Int          @default(0) @map("elements_added")
+  elementsRemoved Int          @default(0) @map("elements_removed")
+  elementsChanged Int          @default(0) @map("elements_changed")
+  diffJson        Json         @map("diff_json")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([pageId])
+  @@index([testRunId])
+  @@index([baselineId])
+  @@map("dom_diffs")
+}
+
+model VisualDiff {
+  id               String       @id @default(uuid())
+  pageId           String       @map("page_id")
+  page             Page         @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  elementId        String?      @map("element_id")
+  element          PageElement? @relation(fields: [elementId], references: [id])
+  testRunId        String       @map("test_run_id")
+  testRun          TestRun      @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  diffPercentage   Float        @default(0) @map("diff_percentage")
+  diffPixels       Int          @default(0) @map("diff_pixels")
+  diffImageUrl     String?      @map("diff_image_url")
+  baselineImageUrl String?      @map("baseline_image_url")
+  actualImageUrl   String?      @map("actual_image_url")
+  status           String       @default("clean") // clean, mismatch, error
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  @@index([pageId])
+  @@index([testRunId])
+  @@index([elementId])
+  @@map("visual_diffs")
 }

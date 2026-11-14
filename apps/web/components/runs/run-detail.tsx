@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { FailureDetailDialog } from "./failure-detail-dialog";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export function RunDetailView({ runId }: RunDetailProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedTestIds, setExpandedTestIds] = useState<Record<string, boolean>>({});
+  const [selectedFailureTest, setSelectedFailureTest] = useState<any | null>(null);
 
   const fetchRun = useCallback(async () => {
     if (!projectId || !runId) return;
@@ -397,8 +399,19 @@ export function RunDetailView({ runId }: RunDetailProps) {
                   >
                     {/* Title */}
                     <div className="min-w-0 pr-2">
-                      <div className="font-medium text-foreground truncate flex items-center gap-1.5">
-                        {res.testName}
+                      <div className="font-medium text-foreground truncate flex items-center gap-1.5 flex-wrap">
+                        <span>{res.testName || res.scenario?.title}</span>
+                        {res.flakyScore > 0 && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            {Math.round(res.flakyScore * 100)}% Flaky
+                          </span>
+                        )}
+                        {res.retryCount > 0 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            {res.retryCount} retry
+                          </span>
+                        )}
                       </div>
                       {res.errorMessage && (
                         <div className="text-[11px] text-rose-400 truncate mt-0.5 font-mono">
@@ -539,6 +552,40 @@ export function RunDetailView({ runId }: RunDetailProps) {
                           </pre>
                         </div>
                       )}
+                      {/* Failure Analysis & Artifacts Action Bar */}
+                      <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            className="gap-1.5 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/40 h-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFailureTest(res);
+                            }}
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Open Rich Failure Analysis</span>
+                          </Button>
+
+                          {artifacts.traceUrl && (
+                            <a
+                              href={`https://trace.playwright.dev/?trace=${encodeURIComponent(artifacts.traceUrl)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8 border-border">
+                                <FileCode2 className="w-3.5 h-3.5" />
+                                <span>Trace Viewer</span>
+                              </Button>
+                            </a>
+                          )}
+                        </div>
+
+                        <span className="text-[11px] text-muted-foreground">
+                          Inspect Playwright trace, video, screenshots, HAR logs, and DOM diff
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -547,6 +594,14 @@ export function RunDetailView({ runId }: RunDetailProps) {
           </div>
         )}
       </div>
+
+      {/* ─── Task 3.8 — Rich Failure Detail Dialog ────────────────────────── */}
+      <FailureDetailDialog
+        testResult={selectedFailureTest}
+        open={Boolean(selectedFailureTest)}
+        onOpenChange={(open) => !open && setSelectedFailureTest(null)}
+      />
     </div>
   );
 }
+

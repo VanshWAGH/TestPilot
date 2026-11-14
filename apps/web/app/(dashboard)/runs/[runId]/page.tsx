@@ -15,3 +15,4 @@ export default async function RunDetailPage({
 
   return <RunDetailView runId={runId} />;
 }
+

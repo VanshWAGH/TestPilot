@@ -36,3 +36,4 @@ export default async function RunsPage() {
 
   return <RunsDashboard initialProjects={projects} />;
 }
+

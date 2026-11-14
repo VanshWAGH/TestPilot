@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendChart } from "./trend-chart";
 import { TriggerRunDialog } from "./trigger-run-dialog";
+import { FlakyTestsCard } from "./flaky-tests-card";
 import type { RunListItem, ProjectOption } from "./types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -286,6 +287,11 @@ export function RunsDashboard({ initialProjects }: RunsDashboardProps) {
             <TrendChart data={trendData} />
           </CardContent>
         </Card>
+      )}
+
+      {/* ─── Flaky Test Detection (Task 3.7) ─────────────────────────────── */}
+      {selectedProjectId && (
+        <FlakyTestsCard projectId={selectedProjectId} />
       )}
 
       {/* ─── Filter Bar ──────────────────────────────────────────────────── */}
