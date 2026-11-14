@@ -296,6 +296,10 @@ model TestResult {
   errorMessage      String?           @map("error_message")
   retryCount        Int               @default(0) @map("retry_count")
   flakyScore        Float             @default(0) @map("flaky_score")
+  failureCategory   String?           @map("failure_category") // product_defect, test_issue, flaky_test, environment_issue
+  failureClassificationReason String? @map("failure_classification_reason")
+  failedStepNumber  Int?              @map("failed_step_number")
+  failedLocator     String?           @map("failed_locator")
   traceUrl          String?           @map("trace_url")
   videoUrl          String?           @map("video_url")
   screenshotUrls    Json?             @map("screenshot_urls")

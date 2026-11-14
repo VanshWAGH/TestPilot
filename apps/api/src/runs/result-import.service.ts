@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException, Optional } 
 import { PrismaService } from "../prisma/prisma.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
 import { DiffEngineService } from "../baselines/diff-engine.service";
+import { FailureClassifierService } from "./failure-classifier.service";
 
 // ─── Playwright JSON Reporter Types ───────────────────────────────────────────
 
@@ -95,6 +96,7 @@ export class ResultImportService {
     private readonly prisma: PrismaService,
     @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
     @Optional() private readonly diffEngineService?: DiffEngineService,
+    @Optional() private readonly failureClassifierService?: FailureClassifierService,
   ) {}
 
   /**
@@ -204,6 +206,15 @@ export class ResultImportService {
       // Match to TestFile & Scenario
       const matched = this.matchScenarioAndTestFile(file, suiteTitle, specTitle, testFiles, scenarios);
 
+      // Task 3.11 — Classify failure category on import
+      const classification = this.failureClassifierService?.classify({
+        status: mappedStatus,
+        errorMessage,
+        retryCount,
+        flakyScore,
+        consoleErrors,
+      });
+
       await this.prisma.testResult.create({
         data: {
           testRunId,
@@ -214,6 +225,10 @@ export class ResultImportService {
           errorMessage,
           retryCount,
           flakyScore,
+          failureCategory: classification?.category,
+          failureClassificationReason: classification?.reason,
+          failedLocator: classification?.failedLocator,
+          failedStepNumber: classification?.failedStepNumber,
           consoleErrors: consoleErrors.length > 0 ? (consoleErrors as any) : undefined,
         },
       });
@@ -271,6 +286,17 @@ export class ResultImportService {
       } catch (err: any) {
         this.logger.warn(
           `Diff generation failed for TestRun ${testRunId}: ${err.message}`,
+        );
+      }
+    }
+
+    // 8. Task 3.11 — Refine failure classification with computed DOM diffs
+    if (this.failureClassifierService) {
+      try {
+        await this.failureClassifierService.classifyRunFailures(testRunId);
+      } catch (err: any) {
+        this.logger.warn(
+          `Post-diff failure classification failed for TestRun ${testRunId}: ${err.message}`,
         );
       }
     }

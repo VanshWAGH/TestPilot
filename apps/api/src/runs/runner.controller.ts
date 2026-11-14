@@ -172,5 +172,27 @@ export class RunnerController {
   ) {
     return this.runnerService.syncArtifactsFromGha(projectId, runId);
   }
+
+  /**
+   * POST /projects/:projectId/runs/:runId/classify
+   * Task 3.11 — Classify failed results in a test run using rule-based classifier.
+   */
+  @Post("projects/:projectId/runs/:runId/classify")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Classify test failures into categories (Task 3.11)",
+    description:
+      "Applies rule-based failure classifier (network errors → environment issue, passes on retry → flaky, element-not-found + DOM changed → test issue, assertion failure → product defect).",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "runId", type: String, description: "UUID of the test run" })
+  @ApiResponse({ status: 200, description: "Number of classified test results" })
+  async classifyFailures(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("runId", ParseUUIDPipe) runId: string,
+  ): Promise<any> {
+    const updatedCount = await this.runnerService.classifyFailures(projectId, runId);
+    return { testRunId: runId, classifiedCount: updatedCount };
+  }
 }
 

@@ -9,6 +9,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ResultImportService, PlaywrightJsonReport } from "./result-import.service";
 import { ArtifactImportService } from "./artifact-import.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
+import { FailureClassifierService } from "./failure-classifier.service";
 import { TriggerRunDto } from "./dto/trigger-run.dto";
 import { ListRunsDto } from "./dto/list-runs.dto";
 import { Octokit } from "@octokit/rest";
@@ -42,6 +43,7 @@ export class RunnerService {
     private readonly resultImportService: ResultImportService,
     private readonly artifactImportService: ArtifactImportService,
     @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
+    @Optional() private readonly failureClassifierService?: FailureClassifierService,
   ) {}
 
   // ─── Instantiate Octokit ──────────────────────────────────────────────────
@@ -453,6 +455,20 @@ export class RunnerService {
     return this.flakyDetectionService.detectFlakyTests(projectId, windowSize);
   }
 
+  // ─── Task 3.11 — Classify failures in a test run ─────────────────────────
+
+  async classifyFailures(projectId: string, runId: string): Promise<any> {
+    const run = await this.prisma.testRun.findFirst({
+      where: { id: runId, projectId },
+    });
+    if (!run) throw new NotFoundException(`TestRun ${runId} not found in project ${projectId}`);
+
+    if (this.failureClassifierService) {
+      return this.failureClassifierService.classifyRunFailures(runId);
+    }
+    return 0;
+  }
+
   // ─── Task 3.2e — Get run status ───────────────────────────────────────────
 
   async getRunStatus(projectId: string, runId: string): Promise<any> {
@@ -468,6 +484,10 @@ export class RunnerService {
             errorMessage: true,
             retryCount: true,
             flakyScore: true,
+            failureCategory: true,
+            failureClassificationReason: true,
+            failedStepNumber: true,
+            failedLocator: true,
             traceUrl: true,
             videoUrl: true,
             screenshotUrls: true,
