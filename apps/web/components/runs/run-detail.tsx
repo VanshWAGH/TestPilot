@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FailureDetailDialog } from "./failure-detail-dialog";
+import { RunStatusBadge } from "./run-status-badge";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ export function RunDetailView({ runId }: RunDetailProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -107,6 +109,27 @@ export function RunDetailView({ runId }: RunDetailProps) {
   useEffect(() => {
     fetchRun();
   }, [fetchRun]);
+
+  // ─── Auto-poll while run is in progress or queued (Task 3.12 polish) ───────
+  useEffect(() => {
+    const activeStatuses = new Set(["queued", "in_progress"]);
+    const status = run?.status;
+
+    if (!status || !activeStatuses.has(status)) {
+      setIsPolling(false);
+      return;
+    }
+
+    setIsPolling(true);
+    const interval = setInterval(() => {
+      fetchRun();
+    }, 10_000); // poll every 10 s
+
+    return () => {
+      clearInterval(interval);
+      setIsPolling(false);
+    };
+  }, [run?.status, fetchRun]);
 
   // Handle Sync Artifacts (Task 3.4)
   const handleSyncArtifacts = async () => {
@@ -206,12 +229,7 @@ export function RunDetailView({ runId }: RunDetailProps) {
             <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
               Run <span className="font-mono text-xl">{run.id.slice(0, 8)}</span>
             </h1>
-            <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusCfg.color}`}
-            >
-              <StatusIcon className="w-3.5 h-3.5" />
-              {statusCfg.label}
-            </span>
+            <RunStatusBadge status={run.status} />
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span>Started: {formatDate(run.startedAt ?? run.createdAt)}</span>
@@ -221,6 +239,12 @@ export function RunDetailView({ runId }: RunDetailProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {isPolling && (
+            <span className="flex items-center gap-1.5 text-[11px] text-blue-400 animate-pulse select-none">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Checking for updates…
+            </span>
+          )}
           {run.githubWorkflowRunId && (
             <a
               href={`https://github.com/actions/runs/${run.githubWorkflowRunId}`}

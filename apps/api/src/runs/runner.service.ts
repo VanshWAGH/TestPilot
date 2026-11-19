@@ -10,6 +10,8 @@ import { ResultImportService, PlaywrightJsonReport } from "./result-import.servi
 import { ArtifactImportService } from "./artifact-import.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
 import { FailureClassifierService } from "./failure-classifier.service";
+import { RunsGateway } from "./runs.gateway";
+import { NotificationService } from "./notification.service";
 import { TriggerRunDto } from "./dto/trigger-run.dto";
 import { ListRunsDto } from "./dto/list-runs.dto";
 import { Octokit } from "@octokit/rest";
@@ -44,6 +46,8 @@ export class RunnerService {
     private readonly artifactImportService: ArtifactImportService,
     @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
     @Optional() private readonly failureClassifierService?: FailureClassifierService,
+    @Optional() private readonly runsGateway?: RunsGateway,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   // ─── Instantiate Octokit ──────────────────────────────────────────────────
@@ -163,6 +167,12 @@ export class RunnerService {
           `Polling error for TestRun ${testRun.id}: ${err.message}`,
         ),
       );
+
+      // 8. Broadcast run started via WebSocket
+      this.runsGateway?.broadcastRunStarted(projectId, testRun.id, {
+        status: "in_progress",
+        githubWorkflowRunId,
+      });
     } catch (err: any) {
       // If dispatch fails, mark run as cancelled and re-throw
       await this.prisma.testRun.update({
@@ -238,6 +248,13 @@ export class RunnerService {
       return;
     }
 
+    // Fetch projectId upfront for broadcast calls
+    const run = await this.prisma.testRun.findUnique({
+      where: { id: testRunId },
+      select: { projectId: true },
+    });
+    const projectId = run?.projectId ?? "";
+
     const octokit = this.getOctokit();
     let attempts = 0;
 
@@ -289,6 +306,46 @@ export class RunnerService {
           `TestRun ${testRunId} completed: status=${status}, duration=${durationMs}ms, artifacts=${artifactsUrl}`,
         );
 
+        // Broadcast completion and send notifications
+        const updatedRun = await this.prisma.testRun.findUnique({
+          where: { id: testRunId },
+          select: {
+            projectId: true,
+            status: true,
+            passed: true,
+            failed: true,
+            total: true,
+            durationMs: true,
+            reportUrl: true,
+          },
+        });
+        const passedCount = updatedRun?.passed ?? 0;
+        const failedCount = updatedRun?.failed ?? 0;
+        const totalTests = updatedRun?.total ?? 0;
+
+        this.runsGateway?.broadcastRunCompleted(
+          updatedRun?.projectId ?? projectId,
+          testRunId,
+          {
+            status,
+            passedCount,
+            failedCount,
+            totalTests,
+            durationMs: updatedRun?.durationMs ?? null,
+            reportUrl: updatedRun?.reportUrl,
+          },
+        );
+        this.notificationService?.notifyRunCompleted({
+          projectId: updatedRun?.projectId ?? projectId,
+          runId: testRunId,
+          status,
+          passedCount,
+          failedCount,
+          totalTests,
+          durationMs: updatedRun?.durationMs ?? null,
+          reportUrl: updatedRun?.reportUrl,
+        });
+
         // Schedule artifact download for Task 3.4 (async, non-blocking)
         this.downloadAndLinkArtifacts(
           testRunId,
@@ -317,6 +374,7 @@ export class RunnerService {
       where: { id: testRunId },
       data: { status: "cancelled", completedAt: new Date() },
     }).catch(() => {});
+    this.runsGateway?.broadcastRunFailed(projectId, testRunId, "Polling timed out");
   }
 
   // ─── Task 3.3 & 3.4 — Download & Import Results + Artifacts ──────────────

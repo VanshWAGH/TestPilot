@@ -287,16 +287,16 @@ testpilot/
 | 3.9 | **Baseline management** | Store DOM baseline + visual baseline per page/element. On new run, generate diff. DOM diff: structural comparison. Visual diff: pixel comparison with threshold. | ✅ **Completed** (`BaselineService` stores DOM snapshots, accessibility trees, visual screenshots, and SHA256 DOM fingerprints per page in `PageBaseline` DB records; supports automatic promotion, active baseline querying, and baseline deprecation lifecycle; triggers automated diff generation on test run completion via `POST /projects/:projectId/baselines` and `GET /projects/:projectId/baselines/:pageId/active`) |
 | 3.10 | **Diff engine** | Compare current DOM/a11y/API/visual state against baselines. Generate structured diff: added/removed/changed elements, attributes, text. | ✅ **Completed** (`DiffEngineService` performs multi-layer structural comparison: DOM diff tracking added/removed/changed elements with attribute and text modifications; accessibility tree comparison tracking ARIA role and state changes; and visual comparison with configurable pixel discrepancy threshold; persists `DomDiff` and `VisualDiff` records linked to test runs with `POST /projects/:projectId/baselines/compare` and `GET /projects/:projectId/runs/:runId/diffs`) |
 | 3.11 | **Failure classification** | Rule-based classifier: network errors → environment issue; passes on retry → flaky; element-not-found + DOM changed → test issue (candidate for healing); assertion failure on stable element → product defect. | ✅ **Completed** (`FailureClassifierService` classifies failures with rule evaluation: network errors/timeouts/5xx → `environment_issue`; retry passing/flaky history → `flaky_test`; locator timeout + structural DOM change → `test_issue` candidate for healing; assertion failure on stable DOM → `product_defect`. Integrated with `ResultImportService`, `RunnerService`, `POST /projects/:projectId/runs/:runId/classify` endpoint, and database fields on `TestResult`) |
-| 3.12 | **Manual run trigger (UI)** | Button to trigger a run from UI. Select environment, test tags (optional), browser. | Run from UI |
-| 3.13 | **Run notifications** | WebSocket push when run completes. Notification toast (Sonner). Optional Slack/email webhook. | User notified |
+| 3.12 | **Manual run trigger (UI)** | Button to trigger a run from UI. Select environment, test tags (optional), browser. | ✅ **Completed** (Interactive `TriggerRunDialog` modal integrated into `/runs` dashboard: lets users select target environment, browser engine [Chromium, Firefox, WebKit, All], and optional Playwright tag/grep filters; dispatches execution via `POST /api/runs/projects/:projectId/runs`, surfaces loading/error feedback, triggers Sonner notification toast, and immediately updates runs table) |
+| 3.13 | **Run notifications** | WebSocket push when run completes. Notification toast (Sonner). Optional Slack/email webhook. | ✅ **Completed** (`RunsGateway` NestJS WebSocket gateway emitting `run:started`, `run:completed`, `run:failed`, and `run:status` events across project and run rooms; `useRunSocket` Next.js hook receiving WebSocket broadcasts, displaying Sonner notification toasts, and auto-refreshing dashboard; `NotificationService` supporting generic webhooks and Slack channel notifications) |
 
 #### Definition of Done
-- [ ] Trigger regression run from UI against SauceDemo
-- [ ] Results imported and displayed with pass/fail counts
-- [ ] Failed tests show trace, video, screenshot, console logs
-- [ ] Flaky tests identified
-- [ ] Failures classified into 4 categories
-- [ ] Trend chart shows pass rate over multiple runs
+- [x] Trigger regression run from UI against SauceDemo
+- [x] Results imported and displayed with pass/fail counts
+- [x] Failed tests show trace, video, screenshot, console logs
+- [x] Flaky tests identified
+- [x] Failures classified into 4 categories
+- [x] Trend chart shows pass rate over multiple runs
 
 ---
 

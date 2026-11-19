@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendChart } from "./trend-chart";
 import { TriggerRunDialog } from "./trigger-run-dialog";
 import { FlakyTestsCard } from "./flaky-tests-card";
+import { RunStatusBadge } from "./run-status-badge";
+import { useRunSocket } from "@/hooks/use-run-socket";
 import type { RunListItem, ProjectOption } from "./types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -82,6 +84,13 @@ export function RunsDashboard({ initialProjects }: RunsDashboardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showTriggerDialog, setShowTriggerDialog] = useState(false);
+
+  // ─── WebSocket auto-refresh (Task 3.13) ────────────────────────────────────
+  useRunSocket({
+    projectId: selectedProjectId,
+    onRunCompleted: () => fetchRuns(),
+    onRunStarted: () => fetchRuns(),
+  });
 
   // ─── Fetch runs ────────────────────────────────────────────────────────────
   const fetchRuns = useCallback(async () => {
@@ -396,12 +405,7 @@ export function RunsDashboard({ initialProjects }: RunsDashboardProps) {
 
                   {/* Status */}
                   <div>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusCfg.color}`}
-                    >
-                      <StatusIcon className="w-3 h-3" />
-                      {statusCfg.label}
-                    </span>
+                    <RunStatusBadge status={run.status} />
                   </div>
 
                   {/* Results Bar */}

@@ -5,6 +5,8 @@ import { ResultImportService } from "./result-import.service";
 import { ArtifactImportService } from "./artifact-import.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
 import { FailureClassifierService } from "./failure-classifier.service";
+import { RunsGateway } from "./runs.gateway";
+import { NotificationService } from "./notification.service";
 import { AuthModule } from "../auth/auth.module";
 import { StorageModule } from "../storage/storage.module";
 import { BaselinesModule } from "../baselines/baselines.module";
@@ -18,6 +20,8 @@ import { BaselinesModule } from "../baselines/baselines.module";
     ArtifactImportService,
     FlakyDetectionService,
     FailureClassifierService,
+    RunsGateway,
+    NotificationService,
   ],
   exports: [
     RunnerService,
@@ -25,6 +29,8 @@ import { BaselinesModule } from "../baselines/baselines.module";
     ArtifactImportService,
     FlakyDetectionService,
     FailureClassifierService,
+    RunsGateway,
+    NotificationService,
   ],
 })
 export class RunsModule {}

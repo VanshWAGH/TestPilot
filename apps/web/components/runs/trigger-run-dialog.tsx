@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +68,10 @@ export function TriggerRunDialog({
 
       onOpenChange(false);
       onTriggered();
+      toast.success("Run dispatched 🚀", {
+        description:
+          "GitHub Actions workflow triggered. The dashboard will update automatically.",
+      });
     } catch (err: any) {
       setError(err.message || "Failed to trigger test run.");
     } finally {
