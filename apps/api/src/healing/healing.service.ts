@@ -17,8 +17,18 @@ import {
   HealingJobData,
   FreshDomCaptureResult,
   EnqueueHealingResult,
+  ElementComparisonResult,
+  GenerateCandidatesResult,
+  OldElementProfile,
 } from "./healing.types";
-import { TriggerHealingDto, CaptureDomDto } from "./dto/trigger-healing.dto";
+import {
+  TriggerHealingDto,
+  CaptureDomDto,
+  CompareFingerprintDto,
+  GenerateCandidatesDto,
+} from "./dto/trigger-healing.dto";
+import { FingerprintComparatorService } from "./fingerprint-comparator.service";
+import { CandidateLocatorGeneratorService } from "./candidate-generator.service";
 
 @Injectable()
 export class HealingService {
@@ -32,9 +42,20 @@ export class HealingService {
     private readonly storage: StorageService,
     private readonly encryption: EncryptionService,
     @Optional()
+    private readonly fingerprintComparator?: FingerprintComparatorService,
+    @Optional()
+    private readonly candidateGenerator?: CandidateLocatorGeneratorService,
+    @Optional()
     @InjectQueue(QUEUES.HEAL)
     private readonly healQueue?: Queue<HealingJobData>,
-  ) {}
+  ) {
+    if (!this.fingerprintComparator) {
+      this.fingerprintComparator = new FingerprintComparatorService();
+    }
+    if (!this.candidateGenerator) {
+      this.candidateGenerator = new CandidateLocatorGeneratorService();
+    }
+  }
 
   // ─── Task 4.1 — Healing Trigger ───────────────────────────────────────────
 
@@ -441,6 +462,177 @@ export class HealingService {
         await browser.close().catch(() => {});
       }
     }
+  }
+
+  // ─── Task 4.3 — Element Fingerprint Comparison ────────────────────────────
+
+  /**
+   * Compares the old element fingerprint (from page_elements or reconstructed from locator)
+   * against the current DOM to find the moved or updated element.
+   */
+  async compareFingerprints(
+    projectId: string,
+    dto: CompareFingerprintDto,
+  ): Promise<ElementComparisonResult> {
+    this.logger.log(
+      `Comparing element fingerprints for project "${projectId}" (elementId: ${dto.elementId}, resultId: ${dto.testResultId}, locator: "${dto.brokenLocator}")`,
+    );
+
+    let oldElement: OldElementProfile | null = null;
+    let pageId: string | null = dto.pageId || null;
+    let targetUrl: string | null = dto.targetUrl || null;
+    let errorMessage: string | undefined;
+
+    // 1. If testResultId provided, resolve result context
+    if (dto.testResultId) {
+      const tr = await this.prisma.testResult.findUnique({
+        where: { id: dto.testResultId },
+        include: {
+          scenario: { include: { page: true } },
+        },
+      });
+
+      if (tr) {
+        if (!pageId && tr.scenario?.pageId) pageId = tr.scenario.pageId;
+        if (!targetUrl && tr.scenario?.page?.url) targetUrl = tr.scenario.page.url;
+        errorMessage = tr.errorMessage || undefined;
+        if (!dto.brokenLocator) {
+          dto.brokenLocator = tr.failedLocator || (tr.errorMessage ? this.extractLocatorFromError(tr.errorMessage) || undefined : undefined);
+        }
+      }
+    }
+
+    // 2. Load old element from DB if elementId provided
+    if (dto.elementId) {
+      const dbEl = await this.prisma.pageElement.findUnique({
+        where: { id: dto.elementId },
+      });
+      if (dbEl) {
+        oldElement = {
+          id: dbEl.id,
+          tag: dbEl.elementTag,
+          role: dbEl.elementRole,
+          accessibleName: dbEl.accessibleName,
+          testId: dbEl.testId,
+          textContent: dbEl.textContent,
+          primaryLocator: dbEl.primaryLocator,
+          fallbackLocators: (dbEl.fallbackLocators as string[]) || [],
+          domFingerprint: dbEl.domFingerprint,
+          domPath: dbEl.domPath,
+        };
+        if (!pageId) pageId = dbEl.pageId;
+      }
+    }
+
+    // 3. If no old element by ID, search existing page_elements by locator match
+    if (!oldElement && pageId && dto.brokenLocator) {
+      const pageElements = await this.prisma.pageElement.findMany({
+        where: { pageId },
+      });
+
+      const matchedDbEl = pageElements.find((el) => {
+        if (el.primaryLocator === dto.brokenLocator) return true;
+        const fallbacks = (el.fallbackLocators as string[]) || [];
+        return fallbacks.includes(dto.brokenLocator!);
+      });
+
+      if (matchedDbEl) {
+        oldElement = {
+          id: matchedDbEl.id,
+          tag: matchedDbEl.elementTag,
+          role: matchedDbEl.elementRole,
+          accessibleName: matchedDbEl.accessibleName,
+          testId: matchedDbEl.testId,
+          textContent: matchedDbEl.textContent,
+          primaryLocator: matchedDbEl.primaryLocator,
+          fallbackLocators: (matchedDbEl.fallbackLocators as string[]) || [],
+          domFingerprint: matchedDbEl.domFingerprint,
+          domPath: matchedDbEl.domPath,
+        };
+      }
+    }
+
+    // 4. Fallback: reconstruct profile from locator & error message
+    if (!oldElement) {
+      if (!dto.brokenLocator) {
+        throw new BadRequestException(
+          "Could not identify old element. Provide elementId, testResultId, or brokenLocator.",
+        );
+      }
+      oldElement = this.fingerprintComparator!.reconstructProfileFromLocator(
+        dto.brokenLocator,
+        errorMessage,
+      );
+    }
+
+    // 5. Capture fresh DOM
+    const freshDom = await this.captureCurrentDom(projectId, {
+      pageId: pageId || undefined,
+      targetUrl: targetUrl || undefined,
+      testResultId: dto.testResultId,
+    });
+
+    // 6. Perform fingerprint comparison
+    const comparison = this.fingerprintComparator!.compare(
+      oldElement,
+      freshDom.elements,
+    );
+
+    this.logger.log(
+      `Fingerprint comparison completed: confidence=${comparison.confidenceScore}%, confident=${comparison.isConfidentMatch}`,
+    );
+
+    return comparison;
+  }
+
+  // ─── Task 4.4 — Candidate Locator Generation ─────────────────────────────
+
+  /**
+   * Generates at least 3 candidate locators using the Playwright locator ladder:
+   * getByTestId() → getByRole() → getByLabel() → getByText() → CSS selector → XPath.
+   */
+  async generateCandidates(
+    projectId: string,
+    dto: GenerateCandidatesDto,
+  ): Promise<GenerateCandidatesResult> {
+    if (!dto.elementId && !dto.element) {
+      throw new BadRequestException(
+        "Either elementId or raw element object must be provided.",
+      );
+    }
+
+    let targetElement: any = dto.element;
+
+    if (dto.elementId) {
+      const dbEl = await this.prisma.pageElement.findUnique({
+        where: { id: dto.elementId },
+      });
+      if (!dbEl) {
+        throw new NotFoundException(`PageElement "${dto.elementId}" not found`);
+      }
+      targetElement = {
+        id: dbEl.id,
+        tag: dbEl.elementTag,
+        role: dbEl.elementRole,
+        accessibleName: dbEl.accessibleName,
+        testId: dbEl.testId,
+        textContent: dbEl.textContent,
+        domPath: dbEl.domPath,
+        primaryLocator: dbEl.primaryLocator,
+        fallbackLocators: dbEl.fallbackLocators,
+      };
+    }
+
+    const result = this.candidateGenerator!.generateCandidates(
+      targetElement,
+      dto.elementId,
+    );
+
+    this.logger.log(
+      `Generated ${result.candidatesCount} candidate locators for element <${result.elementTag}>`,
+    );
+
+    return result;
   }
 
   // ─── Query Healing Proposals (For UI / Task 4.11) ─────────────────────────

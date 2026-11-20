@@ -19,7 +19,12 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { HealingService } from "./healing.service";
-import { TriggerHealingDto, CaptureDomDto } from "./dto/trigger-healing.dto";
+import {
+  TriggerHealingDto,
+  CaptureDomDto,
+  CompareFingerprintDto,
+  GenerateCandidatesDto,
+} from "./dto/trigger-healing.dto";
 import { AuthGuard } from "../auth/auth.guard";
 
 @ApiTags("Self-Healing")
@@ -71,6 +76,48 @@ export class HealingController {
     @Body() dto: CaptureDomDto,
   ): Promise<any> {
     return this.healingService.captureCurrentDom(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/compare-fingerprint
+   * Task 4.3 — Compare old element fingerprint against fresh DOM to locate moved element.
+   */
+  @Post("compare-fingerprint")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Compare element fingerprints (Task 4.3)",
+    description:
+      "Loads old element fingerprint from page_elements (or broken locator) and compares against fresh DOM elements to locate the element's updated location.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Element comparison completed" })
+  @ApiResponse({ status: 400, description: "Invalid element or locator" })
+  async compareFingerprint(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: CompareFingerprintDto,
+  ): Promise<any> {
+    return this.healingService.compareFingerprints(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/generate-candidates
+   * Task 4.4 — Generate at least 3 candidate locators using the locator ladder.
+   */
+  @Post("generate-candidates")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Generate candidate locators (Task 4.4)",
+    description:
+      "Generates at least 3 candidate locators following the locator ladder: getByTestId() → getByRole() → getByLabel() → getByText() → CSS → XPath.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Candidate locators generated" })
+  @ApiResponse({ status: 404, description: "Element not found" })
+  async generateCandidates(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: GenerateCandidatesDto,
+  ): Promise<any> {
+    return this.healingService.generateCandidates(projectId, dto);
   }
 
   /**

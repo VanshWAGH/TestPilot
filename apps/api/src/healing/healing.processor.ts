@@ -49,7 +49,58 @@ export class HealingProcessor extends WorkerHost {
         message: "Fresh DOM captured successfully",
       });
 
-      // Returns the current progress (Tasks 4.3+ will extend downstream)
+      // 2. Task 4.3: Element fingerprint comparison
+      await job.updateProgress({
+        stage: "comparing_fingerprints",
+        percent: 65,
+        message: "Comparing element fingerprints to locate moved element",
+      });
+
+      const comparison = await this.healingService.compareFingerprints(
+        data.projectId,
+        {
+          pageId: data.pageId || undefined,
+          testResultId: data.testResultId,
+          brokenLocator: data.failedLocator || undefined,
+          targetUrl: data.targetUrl || undefined,
+        },
+      );
+
+      this.logger.log(
+        `Fingerprint match for job ${job.id}: confidence=${comparison.confidenceScore}%, confident=${comparison.isConfidentMatch}`,
+      );
+
+      await job.updateProgress({
+        stage: "fingerprint_matched",
+        percent: 75,
+        confidenceScore: comparison.confidenceScore,
+        isConfidentMatch: comparison.isConfidentMatch,
+        message: comparison.message,
+      });
+
+      // 3. Task 4.4: Candidate locator generation
+      await job.updateProgress({
+        stage: "generating_candidates",
+        percent: 85,
+        message: "Generating candidate locators using the locator ladder",
+      });
+
+      let candidatesResult = null;
+      if (comparison.matchedElement) {
+        candidatesResult = await this.healingService.generateCandidates(
+          data.projectId,
+          { element: comparison.matchedElement },
+        );
+      }
+
+      await job.updateProgress({
+        stage: "candidates_generated",
+        percent: 100,
+        candidatesCount: candidatesResult?.candidatesCount || 0,
+        recommended: candidatesResult?.recommendedCandidate?.locator,
+        message: "Candidate locators generated successfully",
+      });
+
       return {
         jobId: job.id,
         testResultId: data.testResultId,
@@ -57,7 +108,12 @@ export class HealingProcessor extends WorkerHost {
         freshDomSnapshotId: freshDom.snapshotId,
         elementsCount: freshDom.elementsCount,
         url: freshDom.url,
-        status: "fresh_dom_available",
+        matchedElement: comparison.matchedElement,
+        confidenceScore: comparison.confidenceScore,
+        isConfidentMatch: comparison.isConfidentMatch,
+        candidates: candidatesResult?.candidates || [],
+        recommendedCandidate: candidatesResult?.recommendedCandidate || null,
+        status: "candidates_generated",
       };
     } catch (err: any) {
       this.logger.error(

@@ -120,6 +120,19 @@ function buildPrismaMock() {
       create: vi.fn().mockResolvedValue(mockSnapshot),
     },
     pageElement: {
+      findUnique: vi.fn().mockResolvedValue({
+        id: "el-1",
+        elementTag: "button",
+        elementRole: "button",
+        accessibleName: "Login",
+        testId: "login-button",
+        textContent: "Login",
+        primaryLocator: 'button[data-test="login-button"]',
+        fallbackLocators: ['#login-button'],
+        domFingerprint: "fp-el-1",
+        domPath: "html > body > button",
+      }),
+      findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
@@ -412,6 +425,72 @@ describe("HealingService", () => {
         }),
       );
       expect(result.screenshotUrl).toBe("https://cdn.example.com/shot.png");
+    });
+  });
+
+  // ─── Task 4.3 — compareFingerprints ────────────────────────────────────────
+
+  describe("compareFingerprints()", () => {
+    it("successfully compares element fingerprints and finds moved element", async () => {
+      const { mockBrowser } = buildPlaywrightMock();
+      service.playwrightLauncherOverride = async () => mockBrowser as any;
+
+      const result = await service.compareFingerprints(PROJECT_ID, {
+        testResultId: TEST_RESULT_ID,
+        brokenLocator: "button[data-test='login-button']",
+      });
+
+      expect(result.isConfidentMatch).toBe(true);
+      expect(result.confidenceScore).toBeGreaterThanOrEqual(45);
+      expect(result.matchedElement).toBeDefined();
+      expect(result.matchedElement?.tag).toBe("button");
+    });
+
+    it("throws BadRequestException when no broken locator or element can be resolved", async () => {
+      prisma.testResult.findUnique.mockResolvedValueOnce({
+        ...mockTestResult,
+        failedLocator: null,
+        errorMessage: null,
+      });
+
+      await expect(
+        service.compareFingerprints(PROJECT_ID, { testResultId: TEST_RESULT_ID }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ─── Task 4.4 — generateCandidates ─────────────────────────────────────────
+
+  describe("generateCandidates()", () => {
+    it("generates at least 3 candidates from existing PageElement ID", async () => {
+      const result = await service.generateCandidates(PROJECT_ID, {
+        elementId: "el-1",
+      });
+
+      expect(result.candidatesCount).toBeGreaterThanOrEqual(3);
+      expect(result.recommendedCandidate).toBeDefined();
+      expect(result.candidates.some((c) => c.type === "getByTestId")).toBe(true);
+    });
+
+    it("generates candidates from raw element object", async () => {
+      const result = await service.generateCandidates(PROJECT_ID, {
+        element: {
+          tag: "button",
+          role: "button",
+          accessibleName: "Add to cart",
+          testId: "add-to-cart",
+          textContent: "Add to cart",
+        },
+      });
+
+      expect(result.candidatesCount).toBeGreaterThanOrEqual(3);
+      expect(result.recommendedCandidate.type).toBe("getByTestId");
+    });
+
+    it("throws BadRequestException when neither elementId nor element is passed", async () => {
+      await expect(
+        service.generateCandidates(PROJECT_ID, {}),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

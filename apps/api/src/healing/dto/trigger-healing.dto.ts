@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsString } from "class-validator";
+import { IsUUID, IsOptional, IsString, IsObject } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class TriggerHealingDto {
@@ -55,4 +55,59 @@ export class CaptureDomDto {
   @IsOptional()
   @IsUUID()
   testResultId?: string;
+}
+
+export class CompareFingerprintDto {
+  @ApiPropertyOptional({
+    description: "Page UUID holding historical element fingerprints",
+  })
+  @IsOptional()
+  @IsUUID()
+  pageId?: string;
+
+  @ApiPropertyOptional({
+    description: "TestResult UUID to load failure context and page from",
+  })
+  @IsOptional()
+  @IsUUID()
+  testResultId?: string;
+
+  @ApiPropertyOptional({
+    description: "The broken locator that failed in the test",
+    example: "button[data-test='add-to-cart']",
+  })
+  @IsOptional()
+  @IsString()
+  brokenLocator?: string;
+
+  @ApiPropertyOptional({
+    description: "Old element ID from page_elements if already known",
+  })
+  @IsOptional()
+  @IsUUID()
+  elementId?: string;
+
+  @ApiPropertyOptional({
+    description: "Target URL to capture fresh DOM if not provided via result",
+    example: "https://www.saucedemo.com/inventory.html",
+  })
+  @IsOptional()
+  @IsString()
+  targetUrl?: string;
+}
+
+export class GenerateCandidatesDto {
+  @ApiPropertyOptional({
+    description: "PageElement UUID to generate candidates for",
+  })
+  @IsOptional()
+  @IsUUID()
+  elementId?: string;
+
+  @ApiPropertyOptional({
+    description: "Raw element object to generate candidates for",
+  })
+  @IsOptional()
+  @IsObject()
+  element?: Record<string, any>;
 }

@@ -8,6 +8,8 @@ describe("HealingProcessor", () => {
   let processor: HealingProcessor;
   let service: {
     captureCurrentDom: ReturnType<typeof vi.fn>;
+    compareFingerprints: ReturnType<typeof vi.fn>;
+    generateCandidates: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -20,6 +22,17 @@ describe("HealingProcessor", () => {
         elementsCount: 12,
         snapshotId: "snapshot-123",
         capturedAt: new Date(),
+      }),
+      compareFingerprints: vi.fn().mockResolvedValue({
+        matchedElement: { tag: "button", testId: "add-to-cart" },
+        confidenceScore: 90,
+        isConfidentMatch: true,
+        message: "Match found",
+      }),
+      generateCandidates: vi.fn().mockResolvedValue({
+        candidatesCount: 3,
+        candidates: [{ locator: 'page.getByTestId("add-to-cart")' }],
+        recommendedCandidate: { locator: 'page.getByTestId("add-to-cart")' },
       }),
     };
 
@@ -62,8 +75,22 @@ describe("HealingProcessor", () => {
     expect(mockJob.updateProgress).toHaveBeenCalledWith(
       expect.objectContaining({ stage: "dom_captured", snapshotId: "snapshot-123" }),
     );
-    expect(result.status).toBe("fresh_dom_available");
+    expect(service.compareFingerprints).toHaveBeenCalledWith(
+      "proj-1",
+      expect.objectContaining({
+        brokenLocator: "button[data-test='add-to-cart']",
+        testResultId: "result-1",
+      }),
+    );
+    expect(service.generateCandidates).toHaveBeenCalledWith("proj-1", {
+      element: { tag: "button", testId: "add-to-cart" },
+    });
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "candidates_generated" }),
+    );
+    expect(result.status).toBe("candidates_generated");
     expect(result.freshDomSnapshotId).toBe("snapshot-123");
-    expect(result.elementsCount).toBe(12);
+    expect(result.confidenceScore).toBe(90);
+    expect(result.candidates).toHaveLength(1);
   });
 });

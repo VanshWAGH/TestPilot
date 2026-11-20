@@ -9,6 +9,8 @@ describe("HealingController", () => {
   let service: {
     enqueueHealing: ReturnType<typeof vi.fn>;
     captureCurrentDom: ReturnType<typeof vi.fn>;
+    compareFingerprints: ReturnType<typeof vi.fn>;
+    generateCandidates: ReturnType<typeof vi.fn>;
     listProposals: ReturnType<typeof vi.fn>;
     getProposal: ReturnType<typeof vi.fn>;
   };
@@ -32,6 +34,15 @@ describe("HealingController", () => {
         elementsCount: 5,
         snapshotId: "snap-1",
         capturedAt: new Date(),
+      }),
+      compareFingerprints: vi.fn().mockResolvedValue({
+        matchedElement: { tag: "button", testId: "add-to-cart" },
+        confidenceScore: 85,
+        isConfidentMatch: true,
+      }),
+      generateCandidates: vi.fn().mockResolvedValue({
+        candidatesCount: 3,
+        candidates: [{ locator: 'page.getByTestId("add-to-cart")' }],
       }),
       listProposals: vi.fn().mockResolvedValue([{ id: "prop-1" }]),
       getProposal: vi.fn().mockResolvedValue({ id: "prop-1" }),
@@ -60,6 +71,20 @@ describe("HealingController", () => {
     const res = await controller.captureDom("proj-1", dto);
     expect(service.captureCurrentDom).toHaveBeenCalledWith("proj-1", dto);
     expect(res.snapshotId).toBe("snap-1");
+  });
+
+  it("POST /projects/:projectId/heal/compare-fingerprint delegates to service.compareFingerprints", async () => {
+    const dto = { brokenLocator: "button[data-test='add-to-cart']" };
+    const res = await controller.compareFingerprint("proj-1", dto);
+    expect(service.compareFingerprints).toHaveBeenCalledWith("proj-1", dto);
+    expect(res.confidenceScore).toBe(85);
+  });
+
+  it("POST /projects/:projectId/heal/generate-candidates delegates to service.generateCandidates", async () => {
+    const dto = { elementId: "el-1" };
+    const res = await controller.generateCandidates("proj-1", dto);
+    expect(service.generateCandidates).toHaveBeenCalledWith("proj-1", dto);
+    expect(res.candidatesCount).toBe(3);
   });
 
   it("GET /projects/:projectId/heal/proposals delegates to service.listProposals", async () => {
