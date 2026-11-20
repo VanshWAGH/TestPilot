@@ -51,12 +51,14 @@ export const TASK_MODEL_REGISTRY: Record<LlmTaskType, string[]> = {
     "cohere/north-mini-code:free",
   ],
   healing: [
-    // Large-context DOM analysis needs 1M+ window
+    // Universal free router automatically routes to active free models
+    "openrouter/free",
+    // Fast 1M context model verified on OpenRouter
+    "nvidia/nemotron-3.5-lightning:free",
+    // Large-context DOM analysis 1M+ window
     "nvidia/nemotron-3-ultra-550b-a55b:free",
     // 256K — Nemotron reasoning for diff and selector matching
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-    // 1M context alternative
-    "nvidia/nemotron-3.5-lightning:free",
     // 1M context fallback
     "baidu/ernie-5.5-flash-preview:free",
   ],
@@ -313,7 +315,7 @@ export class LlmService {
         try {
           const body: Record<string, unknown> = {
             model,
-            models: resolvedModels, // OpenRouter fallback cascade parameter
+            models: resolvedModels.slice(0, 3), // OpenRouter supports up to 3 fallback models
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },

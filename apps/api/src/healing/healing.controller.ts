@@ -24,6 +24,8 @@ import {
   CaptureDomDto,
   CompareFingerprintDto,
   GenerateCandidatesDto,
+  ScoreCandidatesDto,
+  TieBreakCandidatesDto,
 } from "./dto/trigger-healing.dto";
 import { AuthGuard } from "../auth/auth.guard";
 
@@ -118,6 +120,47 @@ export class HealingController {
     @Body() dto: GenerateCandidatesDto,
   ): Promise<any> {
     return this.healingService.generateCandidates(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/score-candidates
+   * Task 4.5 — Deterministically score candidate locators based on the locator scoring matrix.
+   */
+  @Post("score-candidates")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Score candidate locators (Task 4.5)",
+    description:
+      "Scores candidate locators: +10 for test-id, +8 for role+name, +6 for aria-label, +4 for text, +2 for CSS, +1 for XPath. Penalizes ambiguity (-5) and rewards uniqueness (+5) and subtree preservation (+3).",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Scored candidate locators" })
+  @ApiResponse({ status: 400, description: "Invalid candidates payload" })
+  async scoreCandidates(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: ScoreCandidatesDto,
+  ): Promise<any> {
+    return this.healingService.scoreCandidates(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/tie-break
+   * Task 4.6 — LLM tie-breaking for ambiguous candidates within 2 points.
+   */
+  @Post("tie-break")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Resolve candidate tie-break via LLM (Task 4.6)",
+    description:
+      "If the top 2 candidates are within 2 points, invokes LLM to evaluate DOM context and select the most resilient locator.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Tie-break evaluation completed" })
+  async tieBreak(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: TieBreakCandidatesDto,
+  ): Promise<any> {
+    return this.healingService.resolveTieBreak(projectId, dto);
   }
 
   /**

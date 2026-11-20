@@ -81,7 +81,7 @@ export class HealingProcessor extends WorkerHost {
       // 3. Task 4.4: Candidate locator generation
       await job.updateProgress({
         stage: "generating_candidates",
-        percent: 85,
+        percent: 80,
         message: "Generating candidate locators using the locator ladder",
       });
 
@@ -93,12 +93,56 @@ export class HealingProcessor extends WorkerHost {
         );
       }
 
+      // 4. Task 4.5: Deterministic Scoring
       await job.updateProgress({
-        stage: "candidates_generated",
+        stage: "scoring_candidates",
+        percent: 90,
+        message: "Scoring candidate locators with deterministic matrix",
+      });
+
+      let scoringResult = null;
+      if (candidatesResult && candidatesResult.candidates.length > 0) {
+        scoringResult = await this.healingService.scoreCandidates(
+          data.projectId,
+          {
+            candidates: candidatesResult.candidates,
+            elements: freshDom.elements,
+            originalDomPath: comparison.oldElement.domPath || undefined,
+          },
+        );
+      }
+
+      // 5. Task 4.6: LLM Tie-Breaking (if top 2 within 2 points)
+      let tieBreakResult = null;
+      if (scoringResult) {
+        if (scoringResult.isAmbiguous) {
+          await job.updateProgress({
+            stage: "resolving_tie_break",
+            percent: 95,
+            message: `Ambiguous top candidates (gap: ${scoringResult.scoreGap} pts). Invoking LLM tie-breaker.`,
+          });
+        }
+
+        tieBreakResult = await this.healingService.resolveTieBreak(
+          data.projectId,
+          {
+            scoredCandidates: scoringResult.scoredCandidates,
+            brokenLocator: data.failedLocator || undefined,
+            errorMessage: data.errorMessage || undefined,
+            domSnippet: comparison.matchedElement ? `<${comparison.matchedElement.tag} testId="${comparison.matchedElement.testId || ""}">...</${comparison.matchedElement.tag}>` : undefined,
+          },
+        );
+      }
+
+      const selected = tieBreakResult?.selectedCandidate || scoringResult?.topCandidate || candidatesResult?.recommendedCandidate || null;
+
+      await job.updateProgress({
+        stage: "candidates_scored",
         percent: 100,
         candidatesCount: candidatesResult?.candidatesCount || 0,
-        recommended: candidatesResult?.recommendedCandidate?.locator,
-        message: "Candidate locators generated successfully",
+        selectedLocator: selected?.locator,
+        llmUsed: tieBreakResult?.llmUsed || false,
+        message: tieBreakResult?.message || "Candidates generated and scored successfully",
       });
 
       return {
@@ -109,11 +153,14 @@ export class HealingProcessor extends WorkerHost {
         elementsCount: freshDom.elementsCount,
         url: freshDom.url,
         matchedElement: comparison.matchedElement,
-        confidenceScore: comparison.confidenceScore,
+        confidenceScore: (selected as any)?.confidenceScore ?? comparison.confidenceScore,
         isConfidentMatch: comparison.isConfidentMatch,
-        candidates: candidatesResult?.candidates || [],
-        recommendedCandidate: candidatesResult?.recommendedCandidate || null,
-        status: "candidates_generated",
+        candidates: tieBreakResult?.candidates || scoringResult?.scoredCandidates || candidatesResult?.candidates || [],
+        selectedLocator: selected?.locator || null,
+        selectedCandidate: selected,
+        llmUsed: tieBreakResult?.llmUsed || false,
+        llmReasoning: tieBreakResult?.llmReasoning || null,
+        status: "candidates_scored",
       };
     } catch (err: any) {
       this.logger.error(

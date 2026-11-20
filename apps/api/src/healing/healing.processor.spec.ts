@@ -10,6 +10,8 @@ describe("HealingProcessor", () => {
     captureCurrentDom: ReturnType<typeof vi.fn>;
     compareFingerprints: ReturnType<typeof vi.fn>;
     generateCandidates: ReturnType<typeof vi.fn>;
+    scoreCandidates: ReturnType<typeof vi.fn>;
+    resolveTieBreak: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -22,17 +24,32 @@ describe("HealingProcessor", () => {
         elementsCount: 12,
         snapshotId: "snapshot-123",
         capturedAt: new Date(),
+        elements: [],
       }),
       compareFingerprints: vi.fn().mockResolvedValue({
         matchedElement: { tag: "button", testId: "add-to-cart" },
         confidenceScore: 90,
         isConfidentMatch: true,
+        oldElement: { domPath: "html > body > button" },
         message: "Match found",
       }),
       generateCandidates: vi.fn().mockResolvedValue({
         candidatesCount: 3,
         candidates: [{ locator: 'page.getByTestId("add-to-cart")' }],
         recommendedCandidate: { locator: 'page.getByTestId("add-to-cart")' },
+      }),
+      scoreCandidates: vi.fn().mockResolvedValue({
+        scoredCandidates: [{ locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 }],
+        topCandidate: { locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 },
+        runnerUpCandidate: null,
+        scoreGap: 999,
+        isAmbiguous: false,
+      }),
+      resolveTieBreak: vi.fn().mockResolvedValue({
+        llmUsed: false,
+        selectedCandidate: { locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 },
+        candidates: [{ locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 }],
+        message: "Deterministic decision",
       }),
     };
 
@@ -86,11 +103,15 @@ describe("HealingProcessor", () => {
       element: { tag: "button", testId: "add-to-cart" },
     });
     expect(mockJob.updateProgress).toHaveBeenCalledWith(
-      expect.objectContaining({ stage: "candidates_generated" }),
+      expect.objectContaining({ stage: "scoring_candidates" }),
     );
-    expect(result.status).toBe("candidates_generated");
-    expect(result.freshDomSnapshotId).toBe("snapshot-123");
-    expect(result.confidenceScore).toBe(90);
-    expect(result.candidates).toHaveLength(1);
+    expect(service.scoreCandidates).toHaveBeenCalled();
+    expect(service.resolveTieBreak).toHaveBeenCalled();
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "candidates_scored" }),
+    );
+    expect(result.status).toBe("candidates_scored");
+    expect(result.selectedLocator).toBe('page.getByTestId("add-to-cart")');
+    expect(result.llmUsed).toBe(false);
   });
 });

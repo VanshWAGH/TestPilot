@@ -111,3 +111,61 @@ export class GenerateCandidatesDto {
   @IsObject()
   element?: Record<string, any>;
 }
+
+export class ScoreCandidatesDto {
+  @ApiProperty({
+    description: "Array of candidate locators to score",
+  })
+  @IsObject({ each: true })
+  candidates!: Record<string, any>[];
+
+  @ApiPropertyOptional({
+    description: "Page UUID to evaluate element uniqueness and DOM subtree",
+  })
+  @IsOptional()
+  @IsUUID()
+  pageId?: string;
+
+  @ApiPropertyOptional({
+    description: "Fresh DOM elements array for offline context evaluation",
+  })
+  @IsOptional()
+  elements?: Record<string, any>[];
+
+  @ApiPropertyOptional({
+    description: "Original/expected DOM path to evaluate subtree proximity",
+  })
+  @IsOptional()
+  @IsString()
+  originalDomPath?: string;
+}
+
+export class TieBreakCandidatesDto {
+  @ApiProperty({
+    description: "Array of scored candidate locators",
+  })
+  @IsObject({ each: true })
+  scoredCandidates!: Record<string, any>[];
+
+  @ApiPropertyOptional({
+    description: "Original broken locator",
+    example: "button[data-test='add-to-cart']",
+  })
+  @IsOptional()
+  @IsString()
+  brokenLocator?: string;
+
+  @ApiPropertyOptional({
+    description: "Error message from test failure",
+  })
+  @IsOptional()
+  @IsString()
+  errorMessage?: string;
+
+  @ApiPropertyOptional({
+    description: "Relevant DOM context snippet around the element",
+  })
+  @IsOptional()
+  @IsString()
+  domSnippet?: string;
+}

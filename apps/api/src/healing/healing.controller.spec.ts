@@ -11,6 +11,8 @@ describe("HealingController", () => {
     captureCurrentDom: ReturnType<typeof vi.fn>;
     compareFingerprints: ReturnType<typeof vi.fn>;
     generateCandidates: ReturnType<typeof vi.fn>;
+    scoreCandidates: ReturnType<typeof vi.fn>;
+    resolveTieBreak: ReturnType<typeof vi.fn>;
     listProposals: ReturnType<typeof vi.fn>;
     getProposal: ReturnType<typeof vi.fn>;
   };
@@ -43,6 +45,15 @@ describe("HealingController", () => {
       generateCandidates: vi.fn().mockResolvedValue({
         candidatesCount: 3,
         candidates: [{ locator: 'page.getByTestId("add-to-cart")' }],
+      }),
+      scoreCandidates: vi.fn().mockResolvedValue({
+        scoredCandidates: [{ locator: 'page.getByTestId("add-to-cart")', totalScore: 15 }],
+        topCandidate: { locator: 'page.getByTestId("add-to-cart")', totalScore: 15 },
+        isAmbiguous: false,
+      }),
+      resolveTieBreak: vi.fn().mockResolvedValue({
+        llmUsed: true,
+        selectedCandidate: { locator: 'page.getByTestId("add-to-cart")' },
       }),
       listProposals: vi.fn().mockResolvedValue([{ id: "prop-1" }]),
       getProposal: vi.fn().mockResolvedValue({ id: "prop-1" }),
@@ -85,6 +96,20 @@ describe("HealingController", () => {
     const res = await controller.generateCandidates("proj-1", dto);
     expect(service.generateCandidates).toHaveBeenCalledWith("proj-1", dto);
     expect(res.candidatesCount).toBe(3);
+  });
+
+  it("POST /projects/:projectId/heal/score-candidates delegates to service.scoreCandidates", async () => {
+    const dto = { candidates: [{ locator: 'page.getByTestId("add-to-cart")' }] };
+    const res = await controller.scoreCandidates("proj-1", dto);
+    expect(service.scoreCandidates).toHaveBeenCalledWith("proj-1", dto);
+    expect(res.topCandidate).toBeDefined();
+  });
+
+  it("POST /projects/:projectId/heal/tie-break delegates to service.resolveTieBreak", async () => {
+    const dto = { scoredCandidates: [{ locator: 'page.getByTestId("add-to-cart")', totalScore: 10 }] };
+    const res = await controller.tieBreak("proj-1", dto);
+    expect(service.resolveTieBreak).toHaveBeenCalledWith("proj-1", dto);
+    expect(res.llmUsed).toBe(true);
   });
 
   it("GET /projects/:projectId/heal/proposals delegates to service.listProposals", async () => {

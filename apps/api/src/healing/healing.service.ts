@@ -20,15 +20,21 @@ import {
   ElementComparisonResult,
   GenerateCandidatesResult,
   OldElementProfile,
+  DeterministicScoringResult,
+  TieBreakResult,
 } from "./healing.types";
 import {
   TriggerHealingDto,
   CaptureDomDto,
   CompareFingerprintDto,
   GenerateCandidatesDto,
+  ScoreCandidatesDto,
+  TieBreakCandidatesDto,
 } from "./dto/trigger-healing.dto";
 import { FingerprintComparatorService } from "./fingerprint-comparator.service";
 import { CandidateLocatorGeneratorService } from "./candidate-generator.service";
+import { CandidateScorerService } from "./candidate-scorer.service";
+import { LlmTiebreakerService } from "./llm-tiebreaker.service";
 
 @Injectable()
 export class HealingService {
@@ -46,6 +52,10 @@ export class HealingService {
     @Optional()
     private readonly candidateGenerator?: CandidateLocatorGeneratorService,
     @Optional()
+    private readonly candidateScorer?: CandidateScorerService,
+    @Optional()
+    private readonly llmTiebreaker?: LlmTiebreakerService,
+    @Optional()
     @InjectQueue(QUEUES.HEAL)
     private readonly healQueue?: Queue<HealingJobData>,
   ) {
@@ -54,6 +64,12 @@ export class HealingService {
     }
     if (!this.candidateGenerator) {
       this.candidateGenerator = new CandidateLocatorGeneratorService();
+    }
+    if (!this.candidateScorer) {
+      this.candidateScorer = new CandidateScorerService();
+    }
+    if (!this.llmTiebreaker) {
+      this.llmTiebreaker = new LlmTiebreakerService();
     }
   }
 
@@ -633,6 +649,94 @@ export class HealingService {
     );
 
     return result;
+  }
+
+  // ─── Task 4.5 — Deterministic Scoring ─────────────────────────────────────
+
+  /**
+   * Deterministically scores candidate locators based on the Locator Scoring Matrix:
+   * +10 for test-id, +8 for role+name, +6 for aria-label, +4 for text, +2 for CSS, +1 for XPath.
+   * Modifiers: +5 for uniqueness, -5 for ambiguity (>1 matches), +3 for same DOM subtree.
+   */
+  async scoreCandidates(
+    projectId: string,
+    dto: ScoreCandidatesDto,
+  ): Promise<DeterministicScoringResult> {
+    this.logger.log(
+      `Scoring ${dto.candidates?.length || 0} candidate locators for project "${projectId}"`,
+    );
+
+    let freshElements = (dto.elements as any) || [];
+
+    // If pageId provided and no elements passed, load elements from DB
+    if (freshElements.length === 0 && dto.pageId) {
+      const dbElements = await this.prisma.pageElement.findMany({
+        where: { pageId: dto.pageId },
+      });
+      freshElements = dbElements.map((el) => ({
+        tag: el.elementTag,
+        role: el.elementRole || undefined,
+        accessibleName: el.accessibleName || undefined,
+        testId: el.testId || undefined,
+        textContent: el.textContent || undefined,
+        primaryLocator: el.primaryLocator,
+        fallbackLocators: (el.fallbackLocators as string[]) || [],
+        domFingerprint: el.domFingerprint,
+        domPath: el.domPath,
+        attributes: {
+          id: (el as any).id,
+          "data-test": el.testId || "",
+          "data-testid": el.testId || "",
+          "aria-label": el.accessibleName || "",
+        },
+      }));
+    }
+
+    return this.candidateScorer!.scoreCandidates(dto.candidates as any, {
+      freshElements,
+      originalDomPath: dto.originalDomPath,
+    });
+  }
+
+  // ─── Task 4.6 — LLM Tie-Breaking ──────────────────────────────────────────
+
+  /**
+   * If the top 2 candidates are within 2 points, invokes LLM with old/new DOM context
+   * to select the best candidate. Returns immediately if score gap > 2 without LLM.
+   */
+  async resolveTieBreak(
+    projectId: string,
+    dto: TieBreakCandidatesDto,
+  ): Promise<TieBreakResult> {
+    this.logger.log(
+      `Evaluating tie-break for ${dto.scoredCandidates?.length || 0} scored candidates for project "${projectId}"`,
+    );
+
+    if (!dto.scoredCandidates || dto.scoredCandidates.length === 0) {
+      throw new BadRequestException("scoredCandidates array cannot be empty.");
+    }
+
+    const topCandidate = dto.scoredCandidates[0] as any;
+    const runnerUpCandidate =
+      dto.scoredCandidates.length > 1 ? (dto.scoredCandidates[1] as any) : null;
+    const scoreGap = runnerUpCandidate
+      ? Math.abs(topCandidate.totalScore - runnerUpCandidate.totalScore)
+      : 999;
+    const isAmbiguous = runnerUpCandidate !== null && scoreGap <= 2;
+
+    const scoringResult: DeterministicScoringResult = {
+      scoredCandidates: dto.scoredCandidates as any,
+      topCandidate,
+      runnerUpCandidate,
+      scoreGap,
+      isAmbiguous,
+    };
+
+    return this.llmTiebreaker!.resolveTieBreak(scoringResult, {
+      brokenLocator: dto.brokenLocator,
+      errorMessage: dto.errorMessage,
+      domSnippet: dto.domSnippet,
+    });
   }
 
   // ─── Query Healing Proposals (For UI / Task 4.11) ─────────────────────────

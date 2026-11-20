@@ -107,3 +107,43 @@ export interface GenerateCandidatesResult {
   recommendedCandidate: CandidateLocator;
   summary: string;
 }
+
+// ─── Task 4.5 Types (Deterministic Scoring) ───────────────────────────────────
+
+export interface ScoringBreakdown {
+  baseScore: number; // +10, +8, +6, +4, +2, +1
+  uniquenessModifier: number; // +5 for unique match, -5 for multiple matches
+  subtreeModifier: number; // +3 if in same DOM subtree
+  matchCount: number;
+  isUnique: boolean;
+  sameSubtree: boolean;
+  reasons: string[];
+}
+
+export interface ScoredCandidateLocator extends CandidateLocator {
+  totalScore: number;
+  confidenceScore: number; // 0-100%
+  scoringDetails: ScoringBreakdown;
+}
+
+export interface DeterministicScoringResult {
+  scoredCandidates: ScoredCandidateLocator[];
+  topCandidate: ScoredCandidateLocator;
+  runnerUpCandidate: ScoredCandidateLocator | null;
+  scoreGap: number;
+  isAmbiguous: boolean; // true if scoreGap <= 2
+}
+
+// ─── Task 4.6 Types (LLM Tie-Breaking) ───────────────────────────────────────
+
+export interface TieBreakResult {
+  llmUsed: boolean;
+  modelUsed?: string;
+  selectedCandidate: ScoredCandidateLocator;
+  runnerUpCandidate?: ScoredCandidateLocator | null;
+  llmReasoning?: string;
+  scoreGapBefore: number;
+  scoreGapAfter: number;
+  candidates: ScoredCandidateLocator[];
+  message: string;
+}

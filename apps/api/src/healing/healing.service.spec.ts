@@ -494,6 +494,90 @@ describe("HealingService", () => {
     });
   });
 
+  // ─── Task 4.5 — scoreCandidates ───────────────────────────────────────────
+
+  describe("scoreCandidates()", () => {
+    it("scores candidate locators using deterministic matrix", async () => {
+      const candidates = [
+        {
+          locator: 'page.getByTestId("add-to-cart")',
+          selector: '[data-testid="add-to-cart"]',
+          type: "getByTestId" as const,
+          tier: 1,
+          score: 10,
+          strategy: "Test ID",
+          isPlaywrightMethod: true,
+        },
+      ];
+
+      const result = await service.scoreCandidates(PROJECT_ID, { candidates });
+
+      expect(result.scoredCandidates).toHaveLength(1);
+      expect(result.topCandidate.totalScore).toBeGreaterThanOrEqual(10);
+      expect(result.topCandidate.scoringDetails.baseScore).toBe(10);
+    });
+  });
+
+  // ─── Task 4.6 — resolveTieBreak ───────────────────────────────────────────
+
+  describe("resolveTieBreak()", () => {
+    it("returns top candidate without LLM when gap > 2 points", async () => {
+      const scoredCandidates = [
+        {
+          locator: 'page.getByTestId("add-to-cart")',
+          selector: '[data-testid="add-to-cart"]',
+          type: "getByTestId" as const,
+          tier: 1,
+          score: 10,
+          totalScore: 15,
+          confidenceScore: 83,
+          strategy: "Test ID",
+          isPlaywrightMethod: true,
+          scoringDetails: {
+            baseScore: 10,
+            uniquenessModifier: 5,
+            subtreeModifier: 0,
+            matchCount: 1,
+            isUnique: true,
+            sameSubtree: false,
+            reasons: [],
+          },
+        },
+        {
+          locator: 'page.locator("#add-to-cart")',
+          selector: '#add-to-cart',
+          type: "css" as const,
+          tier: 5,
+          score: 2,
+          totalScore: 7,
+          confidenceScore: 39,
+          strategy: "CSS",
+          isPlaywrightMethod: false,
+          scoringDetails: {
+            baseScore: 2,
+            uniquenessModifier: 5,
+            subtreeModifier: 0,
+            matchCount: 1,
+            isUnique: true,
+            sameSubtree: false,
+            reasons: [],
+          },
+        },
+      ];
+
+      const result = await service.resolveTieBreak(PROJECT_ID, { scoredCandidates });
+
+      expect(result.llmUsed).toBe(false);
+      expect(result.selectedCandidate.locator).toBe('page.getByTestId("add-to-cart")');
+    });
+
+    it("throws BadRequestException when scoredCandidates is empty", async () => {
+      await expect(
+        service.resolveTieBreak(PROJECT_ID, { scoredCandidates: [] }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   // ─── listProposals / getProposal ───────────────────────────────────────────
 
   describe("listProposals()", () => {
