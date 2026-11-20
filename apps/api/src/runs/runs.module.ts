@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { RunnerController } from "./runner.controller";
 import { RunnerService } from "./runner.service";
 import { ResultImportService } from "./result-import.service";
@@ -10,9 +10,10 @@ import { NotificationService } from "./notification.service";
 import { AuthModule } from "../auth/auth.module";
 import { StorageModule } from "../storage/storage.module";
 import { BaselinesModule } from "../baselines/baselines.module";
+import { HealingModule } from "../healing/healing.module";
 
 @Module({
-  imports: [AuthModule, StorageModule, BaselinesModule],
+  imports: [AuthModule, StorageModule, BaselinesModule, forwardRef(() => HealingModule)],
   controllers: [RunnerController],
   providers: [
     RunnerService,

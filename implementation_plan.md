@@ -308,8 +308,8 @@ testpilot/
 
 | # | Task | Details | Output |
 |---|------|---------|--------|
-| 4.1 | **Healing trigger** | When failure classifier identifies "test issue (locator broke)", enqueue a healing job for the affected test + element. | Healing job queued |
-| 4.2 | **Current DOM capture** | Re-crawl the specific page where the failure occurred. Capture fresh DOM + a11y tree. | Fresh DOM available |
+| 4.1 | **Healing trigger** | When failure classifier identifies "test issue (locator broke)", enqueue a healing job for the affected test + element. | ✅ **Completed** (Implemented `HealingService.enqueueHealing` and BullMQ queue `QUEUES.HEAL = "heal"`. Connected automatic trigger in `ResultImportService` when failure classifier categorizes a test failure as `test_issue` with broken locator; manual trigger API available via `POST /api/projects/:projectId/heal/trigger` with DTO validation and Swagger documentation) |
+| 4.2 | **Current DOM capture** | Re-crawl the specific page where the failure occurred. Capture fresh DOM + a11y tree. | ✅ **Completed** (Implemented `HealingService.captureCurrentDom` and `HealingProcessor` BullMQ worker; launches Playwright chromium, authenticates with project environment credentials if configured, extracts fresh DOM HTML, accessibility snapshot, and element fingerprints via `DomExtractor.extract()`, captures full-page screenshot, updates `Page` and persists `PageSnapshot` and `PageElement` records; exposes direct trigger at `POST /api/projects/:projectId/heal/capture-dom`) |
 | 4.3 | **Element fingerprint comparison** | Load old element fingerprint from `page_elements`. Compare against current DOM to find the element's new location/attributes. | Moved element found |
 | 4.4 | **Candidate locator generation** | Generate at least 3 candidate locators using the locator ladder: `getByTestId()` → `getByRole()` → `getByLabel()` → `getByText()` → CSS selector → XPath. | Candidates generated |
 | 4.5 | **Deterministic scoring** | Score each candidate: +10 for test-id match, +8 for role+name match, +6 for aria-label, +4 for text, +2 for CSS, +1 for XPath. Penalize for ambiguity (multiple matches). | Scores computed |

@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { FlakyDetectionService } from "./flaky-detection.service";
 import { DiffEngineService } from "../baselines/diff-engine.service";
 import { FailureClassifierService } from "./failure-classifier.service";
+import { HealingService } from "../healing/healing.service";
 
 // ─── Playwright JSON Reporter Types ───────────────────────────────────────────
 
@@ -97,6 +98,7 @@ export class ResultImportService {
     @Optional() private readonly flakyDetectionService?: FlakyDetectionService,
     @Optional() private readonly diffEngineService?: DiffEngineService,
     @Optional() private readonly failureClassifierService?: FailureClassifierService,
+    @Optional() private readonly healingService?: HealingService,
   ) {}
 
   /**
@@ -297,6 +299,43 @@ export class ResultImportService {
       } catch (err: any) {
         this.logger.warn(
           `Post-diff failure classification failed for TestRun ${testRunId}: ${err.message}`,
+        );
+      }
+    }
+
+    // 9. Task 4.1 — Auto-enqueue healing jobs for test_issue failures with broken locators
+    if (this.healingService) {
+      try {
+        const healCandidates = await this.prisma.testResult.findMany({
+          where: {
+            testRunId,
+            failureCategory: "test_issue",
+            status: "failed",
+          },
+          select: {
+            id: true,
+            testRun: { select: { projectId: true } },
+          },
+        });
+
+        for (const candidate of healCandidates) {
+          this.healingService
+            .enqueueHealing(candidate.testRun.projectId, candidate.id)
+            .catch((err: any) =>
+              this.logger.warn(
+                `Auto-healing enqueue skipped for result ${candidate.id}: ${err.message}`,
+              ),
+            );
+        }
+
+        if (healCandidates.length > 0) {
+          this.logger.log(
+            `Auto-enqueued ${healCandidates.length} healing job(s) for TestRun ${testRunId}`,
+          );
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `Auto-healing enqueue failed for TestRun ${testRunId}: ${err.message}`,
         );
       }
     }
