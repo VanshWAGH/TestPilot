@@ -102,6 +102,7 @@ function buildPrismaMock() {
   return {
     testResult: {
       findUnique: vi.fn().mockResolvedValue(mockTestResult),
+      findFirst: vi.fn().mockResolvedValue(mockTestResult),
     },
     project: {
       findUnique: vi.fn().mockResolvedValue(mockProject),
@@ -142,6 +143,7 @@ function buildPrismaMock() {
     healingProposal: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: "prop-new-1", ...data, createdAt: new Date() })),
     },
   };
 }
@@ -575,6 +577,94 @@ describe("HealingService", () => {
       await expect(
         service.resolveTieBreak(PROJECT_ID, { scoredCandidates: [] }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ─── Task 4.7 — validateCandidates ────────────────────────────────────────
+
+  describe("validateCandidates()", () => {
+    it("validates candidates using CandidateValidatorService and mock browser", async () => {
+      const mockPage = {
+        goto: vi.fn().mockResolvedValue(undefined),
+        waitForTimeout: vi.fn().mockResolvedValue(undefined),
+        locator: vi.fn().mockReturnValue({
+          count: vi.fn().mockResolvedValue(1),
+          waitFor: vi.fn().mockResolvedValue(undefined),
+        }),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockBrowser = {
+        newContext: vi.fn().mockResolvedValue({
+          newPage: vi.fn().mockResolvedValue(mockPage),
+        }),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+
+      service.playwrightLauncherOverride = vi.fn().mockResolvedValue(mockBrowser as any);
+
+      const result = await service.validateCandidates(PROJECT_ID, {
+        targetUrl: "https://www.saucedemo.com/inventory.html",
+        scoredCandidates: [
+          {
+            locator: 'page.getByTestId("add-to-cart")',
+            selector: '[data-test="add-to-cart"]',
+            type: "getByTestId",
+            tier: 1,
+            score: 10,
+            totalScore: 15,
+            confidenceScore: 83,
+            strategy: "test-id",
+            isPlaywrightMethod: true,
+            scoringDetails: {
+              baseScore: 10,
+              uniquenessModifier: 5,
+              subtreeModifier: 0,
+              matchCount: 1,
+              isUnique: true,
+              sameSubtree: false,
+              reasons: [],
+            },
+          },
+        ],
+      });
+
+      expect(result.passedCount).toBe(1);
+      expect(result.bestCandidate).toBeDefined();
+      expect(result.bestCandidate?.validationStatus).toBe("passed");
+    });
+  });
+
+  // ─── Task 4.8 — createProposal ────────────────────────────────────────────
+
+  describe("createProposal()", () => {
+    it("persists a proposal using HealingProposalService", async () => {
+      const result = await service.createProposal(PROJECT_ID, {
+        testResultId: TEST_RESULT_ID,
+        oldLocator: "button#old",
+        validationResult: {
+          targetUrl: "https://www.saucedemo.com/inventory.html",
+          totalCandidates: 1,
+          passedCount: 1,
+          failedCount: 0,
+          validatedCandidates: [
+            {
+              selector: '[data-test="add-to-cart"]',
+              validationStatus: "passed",
+              confidenceScore: 92,
+            },
+          ],
+          bestCandidate: {
+            selector: '[data-test="add-to-cart"]',
+            validationStatus: "passed",
+            confidenceScore: 92,
+          },
+          validatedAt: new Date(),
+        },
+      });
+
+      expect(result.id).toBeDefined();
+      expect(result.selectedLocator).toBe('[data-test="add-to-cart"]');
+      expect(result.validationResult).toBe("passed");
     });
   });
 

@@ -26,6 +26,8 @@ import {
   GenerateCandidatesDto,
   ScoreCandidatesDto,
   TieBreakCandidatesDto,
+  ValidateCandidatesDto,
+  CreateProposalDto,
 } from "./dto/trigger-healing.dto";
 import { AuthGuard } from "../auth/auth.guard";
 
@@ -161,6 +163,48 @@ export class HealingController {
     @Body() dto: TieBreakCandidatesDto,
   ): Promise<any> {
     return this.healingService.resolveTieBreak(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/validate-candidates
+   * Task 4.7 — Replay candidate locators against live page to verify visibility and uniqueness.
+   */
+  @Post("validate-candidates")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Validate candidate locators on live page (Task 4.7)",
+    description:
+      "Probes each candidate locator on the live target page using Playwright. Records pass/fail per candidate and filters to candidates that resolve to a visible element.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Candidates validated" })
+  @ApiResponse({ status: 400, description: "Validation error" })
+  async validateCandidates(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: ValidateCandidatesDto,
+  ): Promise<any> {
+    return this.healingService.validateCandidates(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/create-proposal
+   * Task 4.8 — Store healing proposal in database.
+   */
+  @Post("create-proposal")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: "Create healing proposal record (Task 4.8)",
+    description:
+      "Persists a healing proposal record linking the broken locator, selected healed locator, validation results, confidence score, DOM diff, and screenshots.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 201, description: "Healing proposal created" })
+  @ApiResponse({ status: 404, description: "Test result not found" })
+  async createProposal(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Body() dto: CreateProposalDto,
+  ): Promise<any> {
+    return this.healingService.createProposal(projectId, dto);
   }
 
   /**

@@ -169,3 +169,87 @@ export class TieBreakCandidatesDto {
   @IsString()
   domSnippet?: string;
 }
+
+export class ValidateCandidatesDto {
+  @ApiProperty({
+    description: "Array of scored candidate locators to probe on the live page",
+  })
+  @IsObject({ each: true })
+  scoredCandidates!: Record<string, any>[];
+
+  @ApiProperty({
+    description: "Target URL to navigate to for locator probing",
+    example: "https://www.saucedemo.com/inventory.html",
+  })
+  @IsString()
+  targetUrl!: string;
+
+  @ApiPropertyOptional({
+    description: "Environment UUID for auth credentials",
+  })
+  @IsOptional()
+  @IsUUID()
+  environmentId?: string;
+
+  @ApiPropertyOptional({
+    description: "TestResult UUID to infer credentials from",
+  })
+  @IsOptional()
+  @IsUUID()
+  testResultId?: string;
+}
+
+export class CreateProposalDto {
+  @ApiProperty({
+    description: "TestResult UUID this proposal is for",
+  })
+  @IsUUID()
+  testResultId!: string;
+
+  @ApiProperty({
+    description: "The broken/old locator from the failing test",
+    example: "button[data-test='add-to-cart']",
+  })
+  @IsString()
+  oldLocator!: string;
+
+  @ApiPropertyOptional({
+    description: "PageElement UUID if matched in page_elements table",
+  })
+  @IsOptional()
+  @IsUUID()
+  elementId?: string;
+
+  @ApiProperty({
+    description: "Full validation result with all validated candidates",
+  })
+  @IsObject()
+  validationResult!: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: "Whether LLM was used in tie-breaking",
+  })
+  @IsOptional()
+  llmUsed?: boolean;
+
+  @ApiPropertyOptional({
+    description: "Scoring details JSON (for scoringDetails column)",
+  })
+  @IsOptional()
+  @IsObject()
+  scoringDetails?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: "URL of old screenshot (from last crawl snapshot)",
+  })
+  @IsOptional()
+  @IsString()
+  oldScreenshotUrl?: string;
+
+  @ApiPropertyOptional({
+    description: "URL of new screenshot captured during DOM recapture",
+  })
+  @IsOptional()
+  @IsString()
+  newScreenshotUrl?: string;
+}

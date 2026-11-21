@@ -96,7 +96,7 @@ export class HealingProcessor extends WorkerHost {
       // 4. Task 4.5: Deterministic Scoring
       await job.updateProgress({
         stage: "scoring_candidates",
-        percent: 90,
+        percent: 75,
         message: "Scoring candidate locators with deterministic matrix",
       });
 
@@ -118,7 +118,7 @@ export class HealingProcessor extends WorkerHost {
         if (scoringResult.isAmbiguous) {
           await job.updateProgress({
             stage: "resolving_tie_break",
-            percent: 95,
+            percent: 80,
             message: `Ambiguous top candidates (gap: ${scoringResult.scoreGap} pts). Invoking LLM tie-breaker.`,
           });
         }
@@ -138,29 +138,91 @@ export class HealingProcessor extends WorkerHost {
 
       await job.updateProgress({
         stage: "candidates_scored",
-        percent: 100,
+        percent: 85,
         candidatesCount: candidatesResult?.candidatesCount || 0,
         selectedLocator: selected?.locator,
         llmUsed: tieBreakResult?.llmUsed || false,
         message: tieBreakResult?.message || "Candidates generated and scored successfully",
       });
 
+      // 6. Task 4.7: Candidate Validation
+      await job.updateProgress({
+        stage: "validating_candidates",
+        percent: 90,
+        message: "Validating candidate locators on target page",
+      });
+
+      const candidatesToValidate = tieBreakResult?.candidates || scoringResult?.scoredCandidates || [];
+      let validationResult = null;
+      if (candidatesToValidate.length > 0 && freshDom.url) {
+        validationResult = await this.healingService.validateCandidates(data.projectId, {
+          scoredCandidates: candidatesToValidate as any,
+          targetUrl: freshDom.url,
+          environmentId: data.environmentId || undefined,
+          testResultId: data.testResultId,
+        });
+      }
+
+      // 7. Task 4.8: Create Proposal Record
+      await job.updateProgress({
+        stage: "creating_proposal",
+        percent: 95,
+        message: "Persisting healing proposal record in database",
+      });
+
+      let proposalRecord = null;
+      if (validationResult) {
+        proposalRecord = await this.healingService.createProposal(data.projectId, {
+          testResultId: data.testResultId,
+          oldLocator: data.failedLocator || comparison.oldElement.primaryLocator || "unknown",
+          elementId: comparison.matchedElement ? (comparison.matchedElement as any).id || undefined : undefined,
+          validationResult: validationResult as any,
+          llmUsed: tieBreakResult?.llmUsed ?? false,
+          scoringDetails: {
+            scoringResult,
+            tieBreakResult,
+          },
+          newScreenshotUrl: freshDom.screenshotUrl || undefined,
+        });
+      }
+
+      const finalSelectedLocator = proposalRecord?.selectedLocator || selected?.locator || null;
+
+      await job.updateProgress({
+        stage: "proposal_created",
+        percent: 100,
+        proposalId: proposalRecord?.id,
+        selectedLocator: finalSelectedLocator,
+        validationPassed: proposalRecord?.validationResult === "passed",
+        message: proposalRecord ? "Healing proposal created successfully" : "Healing process completed",
+      });
+
       return {
         jobId: job.id,
+        proposalId: proposalRecord?.id || null,
         testResultId: data.testResultId,
         failedLocator: data.failedLocator,
         freshDomSnapshotId: freshDom.snapshotId,
         elementsCount: freshDom.elementsCount,
         url: freshDom.url,
         matchedElement: comparison.matchedElement,
-        confidenceScore: (selected as any)?.confidenceScore ?? comparison.confidenceScore,
+        confidenceScore: proposalRecord?.confidenceScore ?? (selected as any)?.confidenceScore ?? comparison.confidenceScore,
         isConfidentMatch: comparison.isConfidentMatch,
-        candidates: tieBreakResult?.candidates || scoringResult?.scoredCandidates || candidatesResult?.candidates || [],
-        selectedLocator: selected?.locator || null,
-        selectedCandidate: selected,
+        candidates: validationResult?.validatedCandidates || tieBreakResult?.candidates || scoringResult?.scoredCandidates || candidatesResult?.candidates || [],
+        selectedLocator: finalSelectedLocator,
+        selectedCandidate: validationResult?.bestCandidate || selected,
+        validationResult: validationResult
+          ? {
+              totalCandidates: validationResult.totalCandidates,
+              passedCount: validationResult.passedCount,
+              failedCount: validationResult.failedCount,
+              status: proposalRecord?.validationResult,
+            }
+          : null,
+        proposal: proposalRecord,
         llmUsed: tieBreakResult?.llmUsed || false,
         llmReasoning: tieBreakResult?.llmReasoning || null,
-        status: "candidates_scored",
+        status: proposalRecord ? "proposal_created" : "candidates_scored",
       };
     } catch (err: any) {
       this.logger.error(

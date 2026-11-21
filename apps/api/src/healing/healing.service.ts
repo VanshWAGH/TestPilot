@@ -22,6 +22,8 @@ import {
   OldElementProfile,
   DeterministicScoringResult,
   TieBreakResult,
+  CandidateValidationResult,
+  HealingProposalRecord,
 } from "./healing.types";
 import {
   TriggerHealingDto,
@@ -30,11 +32,15 @@ import {
   GenerateCandidatesDto,
   ScoreCandidatesDto,
   TieBreakCandidatesDto,
+  ValidateCandidatesDto,
+  CreateProposalDto,
 } from "./dto/trigger-healing.dto";
 import { FingerprintComparatorService } from "./fingerprint-comparator.service";
 import { CandidateLocatorGeneratorService } from "./candidate-generator.service";
 import { CandidateScorerService } from "./candidate-scorer.service";
 import { LlmTiebreakerService } from "./llm-tiebreaker.service";
+import { CandidateValidatorService } from "./candidate-validator.service";
+import { HealingProposalService } from "./healing-proposal.service";
 
 @Injectable()
 export class HealingService {
@@ -56,6 +62,10 @@ export class HealingService {
     @Optional()
     private readonly llmTiebreaker?: LlmTiebreakerService,
     @Optional()
+    private readonly candidateValidator?: CandidateValidatorService,
+    @Optional()
+    private readonly healingProposalService?: HealingProposalService,
+    @Optional()
     @InjectQueue(QUEUES.HEAL)
     private readonly healQueue?: Queue<HealingJobData>,
   ) {
@@ -70,6 +80,12 @@ export class HealingService {
     }
     if (!this.llmTiebreaker) {
       this.llmTiebreaker = new LlmTiebreakerService();
+    }
+    if (!this.candidateValidator) {
+      this.candidateValidator = new CandidateValidatorService();
+    }
+    if (!this.healingProposalService) {
+      this.healingProposalService = new HealingProposalService(this.prisma);
     }
   }
 
@@ -737,6 +753,79 @@ export class HealingService {
       errorMessage: dto.errorMessage,
       domSnippet: dto.domSnippet,
     });
+  }
+
+  // ─── Task 4.7 — Candidate Validation ──────────────────────────────────────
+
+  /**
+   * For each candidate locator, probes the live page with Playwright to verify
+   * that it resolves to exactly one visible element.
+   */
+  async validateCandidates(
+    projectId: string,
+    dto: ValidateCandidatesDto,
+  ): Promise<CandidateValidationResult> {
+    this.logger.log(
+      `Validating ${dto.scoredCandidates?.length || 0} candidates for project "${projectId}" against ${dto.targetUrl}`,
+    );
+
+    let authHandler: ((page: PlaywrightPage) => Promise<void>) | undefined =
+      undefined;
+    let environmentId = dto.environmentId;
+
+    if (!environmentId && dto.testResultId) {
+      const tr = await this.prisma.testResult.findUnique({
+        where: { id: dto.testResultId },
+        select: { testRun: { select: { environmentId: true } } },
+      });
+      environmentId = tr?.testRun.environmentId || undefined;
+    }
+
+    if (environmentId) {
+      const envWithCreds = await this.prisma.environment.findUnique({
+        where: { id: environmentId },
+        include: { credentials: true },
+      });
+      if (envWithCreds?.credentials) {
+        const c = envWithCreds.credentials;
+        const decrypted = this.encryption.decryptCredentials({
+          usernameEncrypted: c.usernameEncrypted,
+          passwordEncrypted: c.passwordEncrypted,
+          encryptionIv: c.encryptionIv,
+        });
+        if (decrypted.username && decrypted.password) {
+          authHandler = async (page: PlaywrightPage) => {
+            await this.performAuthentication(
+              page,
+              c.loginUrl || dto.targetUrl,
+              decrypted,
+            );
+          };
+        }
+      }
+    }
+
+    return this.candidateValidator!.validateCandidates(
+      dto.scoredCandidates as any,
+      dto.targetUrl,
+      {
+        playwrightLauncherOverride: this.playwrightLauncherOverride,
+        authHandler,
+      },
+    );
+  }
+
+  // ─── Task 4.8 — Healing Proposal Record ───────────────────────────────────
+
+  /**
+   * Persists a healing proposal to the database linking the old locator,
+   * validated new locator, confidence score, DOM diff, and screenshots.
+   */
+  async createProposal(
+    projectId: string,
+    dto: CreateProposalDto,
+  ): Promise<HealingProposalRecord> {
+    return this.healingProposalService!.createProposal(projectId, dto);
   }
 
   // ─── Query Healing Proposals (For UI / Task 4.11) ─────────────────────────

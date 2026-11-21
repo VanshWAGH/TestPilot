@@ -118,7 +118,7 @@ describe("LlmService", () => {
       expect(result.usage.totalTokens).toBe(30);
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-      expect(sentBody.models).toEqual(TASK_MODEL_REGISTRY.scenario_generation);
+      expect(sentBody.models).toEqual(TASK_MODEL_REGISTRY.scenario_generation.slice(0, 3));
       expect(sentBody.model).toBe(TASK_MODEL_REGISTRY.scenario_generation[0]);
     });
 

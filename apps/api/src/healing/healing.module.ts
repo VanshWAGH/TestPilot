@@ -6,6 +6,8 @@ import { FingerprintComparatorService } from "./fingerprint-comparator.service";
 import { CandidateLocatorGeneratorService } from "./candidate-generator.service";
 import { CandidateScorerService } from "./candidate-scorer.service";
 import { LlmTiebreakerService } from "./llm-tiebreaker.service";
+import { CandidateValidatorService } from "./candidate-validator.service";
+import { HealingProposalService } from "./healing-proposal.service";
 import { QueueModule } from "../queue/queue.module";
 import { StorageModule } from "../storage/storage.module";
 import { AuthModule } from "../auth/auth.module";
@@ -28,6 +30,8 @@ import { LlmModule } from "../llm/llm.module";
     CandidateLocatorGeneratorService,
     CandidateScorerService,
     LlmTiebreakerService,
+    CandidateValidatorService,
+    HealingProposalService,
   ],
   exports: [
     HealingService,
@@ -35,6 +39,8 @@ import { LlmModule } from "../llm/llm.module";
     CandidateLocatorGeneratorService,
     CandidateScorerService,
     LlmTiebreakerService,
+    CandidateValidatorService,
+    HealingProposalService,
   ],
 })
 export class HealingModule {}

@@ -12,6 +12,8 @@ describe("HealingProcessor", () => {
     generateCandidates: ReturnType<typeof vi.fn>;
     scoreCandidates: ReturnType<typeof vi.fn>;
     resolveTieBreak: ReturnType<typeof vi.fn>;
+    validateCandidates: ReturnType<typeof vi.fn>;
+    createProposal: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -25,31 +27,62 @@ describe("HealingProcessor", () => {
         snapshotId: "snapshot-123",
         capturedAt: new Date(),
         elements: [],
+        screenshotUrl: "https://storage.test/shot.png",
       }),
       compareFingerprints: vi.fn().mockResolvedValue({
-        matchedElement: { tag: "button", testId: "add-to-cart" },
+        matchedElement: { id: "el-1", tag: "button", testId: "add-to-cart" },
         confidenceScore: 90,
         isConfidentMatch: true,
-        oldElement: { domPath: "html > body > button" },
+        oldElement: { domPath: "html > body > button", primaryLocator: "button#old" },
         message: "Match found",
       }),
       generateCandidates: vi.fn().mockResolvedValue({
         candidatesCount: 3,
-        candidates: [{ locator: 'page.getByTestId("add-to-cart")' }],
-        recommendedCandidate: { locator: 'page.getByTestId("add-to-cart")' },
+        candidates: [{ locator: 'page.getByTestId("add-to-cart")', selector: '[data-test="add-to-cart"]' }],
+        recommendedCandidate: { locator: 'page.getByTestId("add-to-cart")', selector: '[data-test="add-to-cart"]' },
       }),
       scoreCandidates: vi.fn().mockResolvedValue({
-        scoredCandidates: [{ locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 }],
-        topCandidate: { locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 },
+        scoredCandidates: [{ locator: 'page.getByTestId("add-to-cart")', selector: '[data-test="add-to-cart"]', totalScore: 15, confidenceScore: 83 }],
+        topCandidate: { locator: 'page.getByTestId("add-to-cart")', selector: '[data-test="add-to-cart"]', totalScore: 15, confidenceScore: 83 },
         runnerUpCandidate: null,
         scoreGap: 999,
         isAmbiguous: false,
       }),
       resolveTieBreak: vi.fn().mockResolvedValue({
         llmUsed: false,
-        selectedCandidate: { locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 },
-        candidates: [{ locator: 'page.getByTestId("add-to-cart")', totalScore: 15, confidenceScore: 83 }],
+        selectedCandidate: { locator: 'page.getByTestId("add-to-cart")', selector: '[data-test="add-to-cart"]', totalScore: 15, confidenceScore: 83 },
+        candidates: [{ locator: 'page.getByTestId("add-to-cart")', selector: '[data-test="add-to-cart"]', totalScore: 15, confidenceScore: 83 }],
         message: "Deterministic decision",
+      }),
+      validateCandidates: vi.fn().mockResolvedValue({
+        targetUrl: "https://www.saucedemo.com/inventory.html",
+        totalCandidates: 1,
+        passedCount: 1,
+        failedCount: 0,
+        validatedCandidates: [
+          {
+            locator: 'page.getByTestId("add-to-cart")',
+            selector: '[data-test="add-to-cart"]',
+            validationStatus: "passed",
+            confidenceScore: 88,
+          },
+        ],
+        bestCandidate: {
+          locator: 'page.getByTestId("add-to-cart")',
+          selector: '[data-test="add-to-cart"]',
+          validationStatus: "passed",
+          confidenceScore: 88,
+        },
+        validatedAt: new Date(),
+      }),
+      createProposal: vi.fn().mockResolvedValue({
+        id: "prop-123",
+        projectId: "proj-1",
+        testResultId: "result-1",
+        selectedLocator: '[data-test="add-to-cart"]',
+        confidenceScore: 88,
+        validationResult: "passed",
+        status: "pending_review",
       }),
     };
 
@@ -100,7 +133,7 @@ describe("HealingProcessor", () => {
       }),
     );
     expect(service.generateCandidates).toHaveBeenCalledWith("proj-1", {
-      element: { tag: "button", testId: "add-to-cart" },
+      element: { id: "el-1", tag: "button", testId: "add-to-cart" },
     });
     expect(mockJob.updateProgress).toHaveBeenCalledWith(
       expect.objectContaining({ stage: "scoring_candidates" }),
@@ -110,8 +143,20 @@ describe("HealingProcessor", () => {
     expect(mockJob.updateProgress).toHaveBeenCalledWith(
       expect.objectContaining({ stage: "candidates_scored" }),
     );
-    expect(result.status).toBe("candidates_scored");
-    expect(result.selectedLocator).toBe('page.getByTestId("add-to-cart")');
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "validating_candidates" }),
+    );
+    expect(service.validateCandidates).toHaveBeenCalled();
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "creating_proposal" }),
+    );
+    expect(service.createProposal).toHaveBeenCalled();
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "proposal_created" }),
+    );
+    expect(result.status).toBe("proposal_created");
+    expect(result.proposalId).toBe("prop-123");
+    expect(result.selectedLocator).toBe('[data-test="add-to-cart"]');
     expect(result.llmUsed).toBe(false);
   });
 });

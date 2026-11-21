@@ -147,3 +147,57 @@ export interface TieBreakResult {
   candidates: ScoredCandidateLocator[];
   message: string;
 }
+
+// ─── Task 4.7 Types (Candidate Validation) ────────────────────────────────────
+
+export interface ValidatedCandidateLocator extends ScoredCandidateLocator {
+  validationStatus: "passed" | "failed" | "skipped";
+  validationError?: string;
+  matchCount?: number; // how many elements on the page matched
+  isVisible?: boolean;
+}
+
+export interface CandidateValidationResult {
+  targetUrl: string;
+  totalCandidates: number;
+  passedCount: number;
+  failedCount: number;
+  validatedCandidates: ValidatedCandidateLocator[];
+  bestCandidate: ValidatedCandidateLocator | null;
+  validatedAt: Date;
+}
+
+// ─── Task 4.8 Types (Healing Proposal Record) ────────────────────────────────
+
+export interface DomElementDiff {
+  elementId?: string | null;
+  oldLocator: string | null;
+  oldDomPath?: string | null;
+  oldTag?: string | null;
+  oldRole?: string | null;
+  oldAccessibleName?: string | null;
+  newLocator: string | null;
+  newDomPath?: string | null;
+  newTag?: string | null;
+  newRole?: string | null;
+  newAccessibleName?: string | null;
+  changedFields: string[];
+}
+
+export interface HealingProposalRecord {
+  id: string;
+  projectId: string;
+  testResultId: string;
+  elementId?: string | null;
+  oldLocator: string;
+  selectedLocator: string | null;
+  candidateLocators: ValidatedCandidateLocator[];
+  confidenceScore: number;
+  validationResult: "passed" | "failed" | null;
+  llmUsed: boolean;
+  status: string;
+  domDiff?: DomElementDiff | null;
+  oldScreenshotUrl?: string | null;
+  newScreenshotUrl?: string | null;
+  createdAt: Date;
+}
