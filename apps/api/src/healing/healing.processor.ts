@@ -186,6 +186,39 @@ export class HealingProcessor extends WorkerHost {
         });
       }
 
+      // 8. Task 4.9 & 4.10: Open healing branch & PR and trigger CI if repo connected
+      let prResult = null;
+      let ciResult = null;
+      if (proposalRecord && proposalRecord.validationResult === "passed") {
+        try {
+          await job.updateProgress({
+            stage: "opening_pr",
+            percent: 97,
+            message: "Opening GitHub Pull Request with locator fix",
+          });
+
+          prResult = await this.healingService.createHealingBranchAndPr(
+            data.projectId,
+            proposalRecord.id,
+          );
+
+          await job.updateProgress({
+            stage: "triggering_ci",
+            percent: 99,
+            prUrl: prResult.prUrl,
+            message: "Triggering regression workflow on healing PR branch",
+          });
+
+          ciResult = await this.healingService.triggerHealingPrCi(
+            data.projectId,
+            proposalRecord.id,
+            { environmentId: data.environmentId || undefined },
+          );
+        } catch (err: any) {
+          this.logger.warn(`Auto-PR or CI skipped/failed: ${err.message}`);
+        }
+      }
+
       const finalSelectedLocator = proposalRecord?.selectedLocator || selected?.locator || null;
 
       await job.updateProgress({
@@ -193,8 +226,13 @@ export class HealingProcessor extends WorkerHost {
         percent: 100,
         proposalId: proposalRecord?.id,
         selectedLocator: finalSelectedLocator,
+        prUrl: prResult?.prUrl || null,
         validationPassed: proposalRecord?.validationResult === "passed",
-        message: proposalRecord ? "Healing proposal created successfully" : "Healing process completed",
+        message: prResult
+          ? `Healing proposal and PR #${prResult.prNumber} created`
+          : proposalRecord
+            ? "Healing proposal created successfully"
+            : "Healing process completed",
       });
 
       return {
@@ -220,6 +258,8 @@ export class HealingProcessor extends WorkerHost {
             }
           : null,
         proposal: proposalRecord,
+        pr: prResult,
+        ci: ciResult,
         llmUsed: tieBreakResult?.llmUsed || false,
         llmReasoning: tieBreakResult?.llmReasoning || null,
         status: proposalRecord ? "proposal_created" : "candidates_scored",

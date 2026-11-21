@@ -253,3 +253,70 @@ export class CreateProposalDto {
   @IsString()
   newScreenshotUrl?: string;
 }
+
+export class CreateHealingPrDto {
+  @ApiPropertyOptional({
+    description: "Defect or issue tracking identifier (e.g. 'DEF-104') used in branch name heal/<defect-id>-update-locator",
+    example: "DEF-104",
+  })
+  @IsOptional()
+  @IsString()
+  defectId?: string;
+
+  @ApiPropertyOptional({
+    description: "Custom branch name override. Defaults to heal/<defect-id>-update-locator",
+    example: "heal/DEF-104-update-locator",
+  })
+  @IsOptional()
+  @IsString()
+  branch?: string;
+
+  @ApiPropertyOptional({
+    description: "Custom PR title override",
+    example: "🛠️ [Self-Healing] Fix broken login button locator",
+  })
+  @IsOptional()
+  @IsString()
+  prTitle?: string;
+
+  @ApiPropertyOptional({
+    description: "Custom PR body markdown override",
+  })
+  @IsOptional()
+  @IsString()
+  prBody?: string;
+}
+
+export class TriggerHealingCiDto {
+  @ApiPropertyOptional({
+    description: "Environment UUID to run regression tests against",
+  })
+  @IsOptional()
+  @IsUUID()
+  environmentId?: string;
+
+  @ApiPropertyOptional({
+    description: "Browser to run regression against",
+    enum: ["chromium", "firefox", "webkit", "all"],
+    default: "chromium",
+  })
+  @IsOptional()
+  @IsString()
+  browser?: string;
+}
+
+export class PostCiCommentDto {
+  @ApiPropertyOptional({
+    description: "TestRun UUID to report results for. Defaults to linked CI run on proposal.",
+  })
+  @IsOptional()
+  @IsUUID()
+  testRunId?: string;
+
+  @ApiPropertyOptional({
+    description: "Custom comment body override markdown",
+  })
+  @IsOptional()
+  @IsString()
+  customComment?: string;
+}

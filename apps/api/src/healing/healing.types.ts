@@ -201,3 +201,38 @@ export interface HealingProposalRecord {
   newScreenshotUrl?: string | null;
   createdAt: Date;
 }
+
+// ─── Task 4.9 Types (Healing Branch & PR) ────────────────────────────────────
+
+export interface CreateHealingPrResult {
+  proposalId: string;
+  branch: string;
+  prUrl: string;
+  prNumber: number;
+  commitSha: string;
+  pageObjectPath: string;
+  oldLocator: string;
+  newLocator: string;
+  confidenceScore: number;
+  status: string;
+}
+
+// ─── Task 4.10 Types (Healing PR CI Check) ───────────────────────────────────
+
+export interface TriggerHealingCiResult {
+  proposalId: string;
+  testRunId: string;
+  branch: string;
+  status: string;
+  workflowDispatchUrl: string;
+  message: string;
+}
+
+export interface PostCiCommentResult {
+  proposalId: string;
+  prNumber: number;
+  commentUrl?: string;
+  ciStatus: "ci_passed" | "ci_failed";
+  isGreen: boolean;
+  commentBody: string;
+}

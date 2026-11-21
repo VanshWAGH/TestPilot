@@ -6,16 +6,7 @@ import { AuthGuard } from "../auth/auth.guard";
 
 describe("HealingController", () => {
   let controller: HealingController;
-  let service: {
-    enqueueHealing: ReturnType<typeof vi.fn>;
-    captureCurrentDom: ReturnType<typeof vi.fn>;
-    compareFingerprints: ReturnType<typeof vi.fn>;
-    generateCandidates: ReturnType<typeof vi.fn>;
-    scoreCandidates: ReturnType<typeof vi.fn>;
-    resolveTieBreak: ReturnType<typeof vi.fn>;
-    listProposals: ReturnType<typeof vi.fn>;
-    getProposal: ReturnType<typeof vi.fn>;
-  };
+  let service: Record<string, ReturnType<typeof vi.fn>>;
 
   const mockAuthGuard = { canActivate: vi.fn().mockReturnValue(true) };
 
@@ -54,6 +45,27 @@ describe("HealingController", () => {
       resolveTieBreak: vi.fn().mockResolvedValue({
         llmUsed: true,
         selectedCandidate: { locator: 'page.getByTestId("add-to-cart")' },
+      }),
+      validateCandidates: vi.fn().mockResolvedValue({
+        passedCount: 1,
+        bestCandidate: { selector: '[data-test="add-to-cart"]' },
+      }),
+      createProposal: vi.fn().mockResolvedValue({
+        id: "prop-1",
+        selectedLocator: '[data-test="add-to-cart"]',
+      }),
+      createHealingBranchAndPr: vi.fn().mockResolvedValue({
+        prUrl: "https://github.com/owner/repo/pull/42",
+        prNumber: 42,
+        branch: "heal/res-1-update-locator",
+      }),
+      triggerHealingPrCi: vi.fn().mockResolvedValue({
+        testRunId: "run-ci-1",
+        status: "in_progress",
+      }),
+      postCiResultsComment: vi.fn().mockResolvedValue({
+        isGreen: true,
+        ciStatus: "ci_passed",
       }),
       listProposals: vi.fn().mockResolvedValue([{ id: "prop-1" }]),
       getProposal: vi.fn().mockResolvedValue({ id: "prop-1" }),
@@ -110,6 +122,41 @@ describe("HealingController", () => {
     const res = await controller.tieBreak("proj-1", dto);
     expect(service.resolveTieBreak).toHaveBeenCalledWith("proj-1", dto);
     expect(res.llmUsed).toBe(true);
+  });
+
+  it("POST /projects/:projectId/heal/validate-candidates delegates to service.validateCandidates", async () => {
+    const dto = { targetUrl: "https://example.com", scoredCandidates: [] };
+    const res = await controller.validateCandidates("proj-1", dto as any);
+    expect(service.validateCandidates).toHaveBeenCalledWith("proj-1", dto);
+    expect(res.passedCount).toBe(1);
+  });
+
+  it("POST /projects/:projectId/heal/create-proposal delegates to service.createProposal", async () => {
+    const dto = { testResultId: "res-1", oldLocator: "button", validationResult: {} };
+    const res = await controller.createProposal("proj-1", dto as any);
+    expect(service.createProposal).toHaveBeenCalledWith("proj-1", dto);
+    expect(res.id).toBe("prop-1");
+  });
+
+  it("POST /projects/:projectId/heal/proposals/:proposalId/create-pr delegates to service.createHealingBranchAndPr", async () => {
+    const dto = { defectId: "DEF-104" };
+    const res = await controller.createHealingPr("proj-1", "prop-1", dto);
+    expect(service.createHealingBranchAndPr).toHaveBeenCalledWith("proj-1", "prop-1", dto);
+    expect(res.prNumber).toBe(42);
+  });
+
+  it("POST /projects/:projectId/heal/proposals/:proposalId/trigger-ci delegates to service.triggerHealingPrCi", async () => {
+    const dto = { browser: "chromium" };
+    const res = await controller.triggerHealingCi("proj-1", "prop-1", dto);
+    expect(service.triggerHealingPrCi).toHaveBeenCalledWith("proj-1", "prop-1", dto);
+    expect(res.testRunId).toBe("run-ci-1");
+  });
+
+  it("POST /projects/:projectId/heal/proposals/:proposalId/post-ci-comment delegates to service.postCiResultsComment", async () => {
+    const dto = { testRunId: "run-ci-1" };
+    const res = await controller.postCiResultsComment("proj-1", "prop-1", dto);
+    expect(service.postCiResultsComment).toHaveBeenCalledWith("proj-1", "prop-1", dto);
+    expect(res.isGreen).toBe(true);
   });
 
   it("GET /projects/:projectId/heal/proposals delegates to service.listProposals", async () => {

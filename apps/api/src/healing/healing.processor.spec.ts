@@ -6,15 +6,7 @@ import { Job } from "bullmq";
 
 describe("HealingProcessor", () => {
   let processor: HealingProcessor;
-  let service: {
-    captureCurrentDom: ReturnType<typeof vi.fn>;
-    compareFingerprints: ReturnType<typeof vi.fn>;
-    generateCandidates: ReturnType<typeof vi.fn>;
-    scoreCandidates: ReturnType<typeof vi.fn>;
-    resolveTieBreak: ReturnType<typeof vi.fn>;
-    validateCandidates: ReturnType<typeof vi.fn>;
-    createProposal: ReturnType<typeof vi.fn>;
-  };
+  let service: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(async () => {
     service = {
@@ -84,6 +76,26 @@ describe("HealingProcessor", () => {
         validationResult: "passed",
         status: "pending_review",
       }),
+      createHealingBranchAndPr: vi.fn().mockResolvedValue({
+        proposalId: "prop-123",
+        branch: "heal/result-1-update-locator",
+        prUrl: "https://github.com/owner/repo/pull/42",
+        prNumber: 42,
+        commitSha: "sha-123",
+        pageObjectPath: "pages/inventory.page.ts",
+        oldLocator: "button[data-test='add-to-cart']",
+        newLocator: '[data-test="add-to-cart"]',
+        confidenceScore: 88,
+        status: "open",
+      }),
+      triggerHealingPrCi: vi.fn().mockResolvedValue({
+        proposalId: "prop-123",
+        testRunId: "run-ci-999",
+        branch: "heal/result-1-update-locator",
+        status: "in_progress",
+        workflowDispatchUrl: "https://github.com/owner/repo/actions/workflows/regression.yml",
+        message: "Triggered",
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -152,11 +164,21 @@ describe("HealingProcessor", () => {
     );
     expect(service.createProposal).toHaveBeenCalled();
     expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "opening_pr" }),
+    );
+    expect(service.createHealingBranchAndPr).toHaveBeenCalled();
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "triggering_ci" }),
+    );
+    expect(service.triggerHealingPrCi).toHaveBeenCalled();
+    expect(mockJob.updateProgress).toHaveBeenCalledWith(
       expect.objectContaining({ stage: "proposal_created" }),
     );
     expect(result.status).toBe("proposal_created");
     expect(result.proposalId).toBe("prop-123");
     expect(result.selectedLocator).toBe('[data-test="add-to-cart"]');
+    expect(result.pr?.prUrl).toBe("https://github.com/owner/repo/pull/42");
+    expect(result.ci?.testRunId).toBe("run-ci-999");
     expect(result.llmUsed).toBe(false);
   });
 });

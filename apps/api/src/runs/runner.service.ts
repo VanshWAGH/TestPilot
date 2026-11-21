@@ -89,7 +89,7 @@ export class RunnerService {
       );
     }
     const [owner, repo] = repoParts;
-    const ref = project.githubBranch || "main";
+    const ref = dto.branch || project.githubBranch || "main";
 
     // 2. Resolve environment
     let environment = dto.environmentId

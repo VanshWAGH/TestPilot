@@ -24,6 +24,9 @@ import {
   TieBreakResult,
   CandidateValidationResult,
   HealingProposalRecord,
+  CreateHealingPrResult,
+  TriggerHealingCiResult,
+  PostCiCommentResult,
 } from "./healing.types";
 import {
   TriggerHealingDto,
@@ -34,6 +37,9 @@ import {
   TieBreakCandidatesDto,
   ValidateCandidatesDto,
   CreateProposalDto,
+  CreateHealingPrDto,
+  TriggerHealingCiDto,
+  PostCiCommentDto,
 } from "./dto/trigger-healing.dto";
 import { FingerprintComparatorService } from "./fingerprint-comparator.service";
 import { CandidateLocatorGeneratorService } from "./candidate-generator.service";
@@ -41,6 +47,7 @@ import { CandidateScorerService } from "./candidate-scorer.service";
 import { LlmTiebreakerService } from "./llm-tiebreaker.service";
 import { CandidateValidatorService } from "./candidate-validator.service";
 import { HealingProposalService } from "./healing-proposal.service";
+import { HealingPrService } from "./healing-pr.service";
 
 @Injectable()
 export class HealingService {
@@ -66,6 +73,8 @@ export class HealingService {
     @Optional()
     private readonly healingProposalService?: HealingProposalService,
     @Optional()
+    private readonly healingPrService?: HealingPrService,
+    @Optional()
     @InjectQueue(QUEUES.HEAL)
     private readonly healQueue?: Queue<HealingJobData>,
   ) {
@@ -86,6 +95,9 @@ export class HealingService {
     }
     if (!this.healingProposalService) {
       this.healingProposalService = new HealingProposalService(this.prisma);
+    }
+    if (!this.healingPrService) {
+      this.healingPrService = new HealingPrService(this.prisma);
     }
   }
 
@@ -826,6 +838,56 @@ export class HealingService {
     dto: CreateProposalDto,
   ): Promise<HealingProposalRecord> {
     return this.healingProposalService!.createProposal(projectId, dto);
+  }
+
+  // ─── Task 4.9 — Healing Branch & PR ───────────────────────────────────────
+
+  /**
+   * Creates branch `heal/<defect-id>-update-locator`, updates the locator in the
+   * page object file, and opens a GitHub Pull Request with rich evidence.
+   */
+  async createHealingBranchAndPr(
+    projectId: string,
+    proposalId: string,
+    dto?: CreateHealingPrDto,
+  ): Promise<CreateHealingPrResult> {
+    return this.healingPrService!.createHealingBranchAndPr(
+      projectId,
+      proposalId,
+      dto,
+    );
+  }
+
+  // ─── Task 4.10 — Healing PR CI Check ──────────────────────────────────────
+
+  /**
+   * Triggers the regression workflow against the healing PR branch.
+   */
+  async triggerHealingPrCi(
+    projectId: string,
+    proposalId: string,
+    dto?: TriggerHealingCiDto,
+  ): Promise<TriggerHealingCiResult> {
+    return this.healingPrService!.triggerHealingPrCi(
+      projectId,
+      proposalId,
+      dto,
+    );
+  }
+
+  /**
+   * Evaluates CI run results and posts a summary comment to the GitHub PR.
+   */
+  async postCiResultsComment(
+    projectId: string,
+    proposalId: string,
+    dto?: PostCiCommentDto,
+  ): Promise<PostCiCommentResult> {
+    return this.healingPrService!.postCiResultsComment(
+      projectId,
+      proposalId,
+      dto,
+    );
   }
 
   // ─── Query Healing Proposals (For UI / Task 4.11) ─────────────────────────

@@ -668,6 +668,54 @@ describe("HealingService", () => {
     });
   });
 
+  // ─── Task 4.9 & 4.10 — PR & CI Operations ─────────────────────────────────
+
+  describe("createHealingBranchAndPr() & CI", () => {
+    it("delegates createHealingBranchAndPr to HealingPrService", async () => {
+      const mockPrResult = {
+        proposalId: "prop-1",
+        branch: "heal/DEF-104-update-locator",
+        prUrl: "https://github.com/owner/repo/pull/1",
+        prNumber: 1,
+        commitSha: "sha-1",
+        pageObjectPath: "pages/login.page.ts",
+        oldLocator: "button",
+        newLocator: "button[data-test='login']",
+        confidenceScore: 95,
+        status: "open",
+      };
+      (service as any).healingPrService = {
+        createHealingBranchAndPr: vi.fn().mockResolvedValue(mockPrResult),
+        triggerHealingPrCi: vi.fn().mockResolvedValue({
+          proposalId: "prop-1",
+          testRunId: "run-1",
+          branch: "heal/DEF-104-update-locator",
+          status: "in_progress",
+          workflowDispatchUrl: "https://github.com",
+          message: "Triggered",
+        }),
+        postCiResultsComment: vi.fn().mockResolvedValue({
+          proposalId: "prop-1",
+          prNumber: 1,
+          ciStatus: "ci_passed",
+          isGreen: true,
+          commentBody: "Green CI",
+        }),
+      };
+
+      const pr = await service.createHealingBranchAndPr(PROJECT_ID, "prop-1", {
+        defectId: "DEF-104",
+      });
+      expect(pr.prNumber).toBe(1);
+
+      const ci = await service.triggerHealingPrCi(PROJECT_ID, "prop-1");
+      expect(ci.testRunId).toBe("run-1");
+
+      const comment = await service.postCiResultsComment(PROJECT_ID, "prop-1");
+      expect(comment.isGreen).toBe(true);
+    });
+  });
+
   // ─── listProposals / getProposal ───────────────────────────────────────────
 
   describe("listProposals()", () => {

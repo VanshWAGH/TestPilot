@@ -28,6 +28,9 @@ import {
   TieBreakCandidatesDto,
   ValidateCandidatesDto,
   CreateProposalDto,
+  CreateHealingPrDto,
+  TriggerHealingCiDto,
+  PostCiCommentDto,
 } from "./dto/trigger-healing.dto";
 import { AuthGuard } from "../auth/auth.guard";
 
@@ -205,6 +208,77 @@ export class HealingController {
     @Body() dto: CreateProposalDto,
   ): Promise<any> {
     return this.healingService.createProposal(projectId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/proposals/:proposalId/create-pr
+   * Task 4.9 — Create healing branch and open GitHub PR with locator fix & evidence.
+   */
+  @Post("proposals/:proposalId/create-pr")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: "Create healing branch and PR on GitHub (Task 4.9)",
+    description:
+      "Creates branch heal/<defect-id>-update-locator, patches the broken locator in the page object file, and opens a GitHub Pull Request with rich evidence.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "proposalId", type: String, description: "UUID of the healing proposal" })
+  @ApiResponse({ status: 201, description: "Healing PR created" })
+  @ApiResponse({ status: 400, description: "Invalid repository or proposal state" })
+  @ApiResponse({ status: 404, description: "Proposal not found" })
+  async createHealingPr(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("proposalId", ParseUUIDPipe) proposalId: string,
+    @Body() dto: CreateHealingPrDto,
+  ): Promise<any> {
+    return this.healingService.createHealingBranchAndPr(projectId, proposalId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/proposals/:proposalId/trigger-ci
+   * Task 4.10 — Trigger regression workflow on the healing PR branch.
+   */
+  @Post("proposals/:proposalId/trigger-ci")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: "Trigger regression workflow on healing PR branch (Task 4.10)",
+    description:
+      "Dispatches the GitHub Actions regression workflow against the heal/<defect-id>-update-locator branch.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "proposalId", type: String, description: "UUID of the healing proposal" })
+  @ApiResponse({ status: 202, description: "CI workflow dispatched" })
+  @ApiResponse({ status: 400, description: "PR or runner unavailable" })
+  @ApiResponse({ status: 404, description: "Proposal not found" })
+  async triggerHealingCi(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("proposalId", ParseUUIDPipe) proposalId: string,
+    @Body() dto: TriggerHealingCiDto,
+  ): Promise<any> {
+    return this.healingService.triggerHealingPrCi(projectId, proposalId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/proposals/:proposalId/post-ci-comment
+   * Task 4.10 — Post CI execution results as a comment on the GitHub PR.
+   */
+  @Post("proposals/:proposalId/post-ci-comment")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Post CI results comment to GitHub PR (Task 4.10)",
+    description:
+      "Evaluates CI run results and posts a summary comment to the GitHub PR indicating pass/fail and merge safety.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "proposalId", type: String, description: "UUID of the healing proposal" })
+  @ApiResponse({ status: 200, description: "CI result comment posted" })
+  @ApiResponse({ status: 404, description: "Proposal or TestRun not found" })
+  async postCiResultsComment(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("proposalId", ParseUUIDPipe) proposalId: string,
+    @Body() dto: PostCiCommentDto,
+  ): Promise<any> {
+    return this.healingService.postCiResultsComment(projectId, proposalId, dto);
   }
 
   /**
