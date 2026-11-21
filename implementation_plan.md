@@ -337,13 +337,13 @@ testpilot/
 | Same DOM subtree | +3 | Element in same parent container |
 
 #### Definition of Done
-- [ ] Simulate a broken locator on SauceDemo (rename a test-id)
-- [ ] Platform detects the broken locator from test failure
-- [ ] Generates 3+ candidate locators with scores
-- [ ] Validates candidates by replaying the test
-- [ ] Opens a healing PR with evidence
-- [ ] CI runs on the healing branch
-- [ ] Reviewer can approve/reject in UI
+- [x] Simulate a broken locator on SauceDemo (rename a test-id)
+- [x] Platform detects the broken locator from test failure
+- [x] Generates 3+ candidate locators with scores
+- [x] Validates candidates by replaying the test
+- [x] Opens a healing PR with evidence
+- [x] CI runs on the healing branch
+- [x] Reviewer can approve/reject in UI
 
 ---
 
