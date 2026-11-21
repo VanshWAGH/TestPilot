@@ -320,3 +320,28 @@ export class PostCiCommentDto {
   @IsString()
   customComment?: string;
 }
+
+export class ReviewProposalDto {
+  @ApiProperty({
+    description: "Review decision for the healing proposal",
+    enum: ["approve", "reject"],
+    example: "approve",
+  })
+  @IsString()
+  action!: "approve" | "reject";
+
+  @ApiPropertyOptional({
+    description: "User identifier or email performing the review",
+    example: "qa-lead@example.com",
+  })
+  @IsOptional()
+  @IsString()
+  reviewedBy?: string;
+
+  @ApiPropertyOptional({
+    description: "Optional review comment or reason",
+  })
+  @IsOptional()
+  @IsString()
+  comment?: string;
+}

@@ -14,11 +14,13 @@ import {
   CreateHealingPrResult,
   TriggerHealingCiResult,
   PostCiCommentResult,
+  ReviewProposalResult,
 } from "./healing.types";
 import {
   CreateHealingPrDto,
   TriggerHealingCiDto,
   PostCiCommentDto,
+  ReviewProposalDto,
 } from "./dto/trigger-healing.dto";
 
 @Injectable()
@@ -531,15 +533,49 @@ ${
       this.logger.warn(`Could not post GitHub comment on PR #${prNumber}: ${err.message}`);
     }
 
-    // Update proposal with final CI status
+    // Task 4.12: Auto-safe mode check
+    // If project.autoHealMode === "auto-safe" AND confidenceScore >= 95 AND isGreen:
+    let finalProposalStatus = proposal.status;
+    let finalPrStatus = ciStatus;
+
+    if (
+      project.autoHealMode === "auto-safe" &&
+      proposal.confidenceScore >= 95 &&
+      isGreen &&
+      owner &&
+      repo
+    ) {
+      try {
+        await octokit.pulls.merge({
+          owner,
+          repo,
+          pull_number: prNumber,
+          merge_method: "squash",
+          commit_title: `Auto-heal: self-healed locator "${proposal.oldLocator}" -> "${proposal.selectedLocator}" (Confidence: ${Math.round(proposal.confidenceScore)}%)`,
+        });
+        finalProposalStatus = "auto_merged";
+        finalPrStatus = "merged";
+        this.logger.log(
+          `Auto-merged PR #${prNumber} for proposal "${proposal.id}" under auto-safe mode (confidence: ${proposal.confidenceScore}% >= 95%)`,
+        );
+      } catch (mergeErr: any) {
+        this.logger.warn(`Auto-merge failed on PR #${prNumber}: ${mergeErr.message}`);
+      }
+    }
+
+    // Update proposal with final CI status and auto-merge state
     await this.prisma.healingProposal.update({
       where: { id: proposal.id },
       data: {
-        prStatus: ciStatus,
+        status: finalProposalStatus,
+        prStatus: finalPrStatus,
+        reviewedBy: finalProposalStatus === "auto_merged" ? "auto-safe-engine" : proposal.reviewedBy,
+        reviewedAt: finalProposalStatus === "auto_merged" ? new Date() : proposal.reviewedAt,
         scoringDetails: {
           ...scoringDetails,
           ciStatus,
           isGreen,
+          autoMerged: finalProposalStatus === "auto_merged",
           ciPassedCount: testRun.passed,
           ciFailedCount: testRun.failed,
           ciCommentUrl: commentUrl,
@@ -555,6 +591,110 @@ ${
       ciStatus,
       isGreen,
       commentBody,
+    };
+  }
+
+  // ─── Task 4.12 & 4.11 — Review Proposal (Approve / Reject) ────────────────
+
+  /**
+   * Reviews a healing proposal (Approve or Reject).
+   * - Approve: Merges the GitHub PR (if open) and marks proposal approved.
+   * - Reject: Closes the GitHub PR (if open) and marks proposal rejected.
+   */
+  async reviewProposal(
+    projectId: string,
+    proposalId: string,
+    dto: ReviewProposalDto,
+  ): Promise<ReviewProposalResult> {
+    this.logger.log(
+      `Reviewing proposal "${proposalId}" in project "${projectId}": action=${dto.action}`,
+    );
+
+    const proposal = await this.prisma.healingProposal.findFirst({
+      where: { id: proposalId, projectId },
+      include: { project: true },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`HealingProposal "${proposalId}" not found`);
+    }
+
+    const scoringDetails = (proposal.scoringDetails as any) || {};
+    const prNumber = scoringDetails.prNumber;
+    const project = proposal.project;
+    const repoParts = project.githubTestRepo?.split("/") || [];
+    const [owner, repo] = repoParts;
+
+    const octokit = this.getOctokitClient(project.githubInstallationId);
+    const finalStatus: "approved" | "rejected" =
+      dto.action === "approve" ? "approved" : "rejected";
+    let finalPrStatus: "merged" | "closed" | "open" =
+      dto.action === "approve" ? "merged" : "closed";
+
+    if (owner && repo && prNumber) {
+      try {
+        if (dto.action === "approve") {
+          await octokit.pulls.merge({
+            owner,
+            repo,
+            pull_number: prNumber,
+            merge_method: "squash",
+            commit_title: `Healed: self-healed locator for ${proposal.oldLocator}`,
+          });
+          finalPrStatus = "merged";
+          this.logger.log(`Approved & merged GitHub PR #${prNumber}`);
+        } else {
+          await octokit.pulls.update({
+            owner,
+            repo,
+            pull_number: prNumber,
+            state: "closed",
+          });
+          finalPrStatus = "closed";
+          this.logger.log(`Rejected & closed GitHub PR #${prNumber}`);
+        }
+
+        // Post review comment on PR
+        if (dto.comment) {
+          await octokit.issues.createComment({
+            owner,
+            repo,
+            issue_number: prNumber,
+            body: `**Review Action:** ${dto.action === "approve" ? "✅ Approved" : "❌ Rejected"}\n**Reviewer:** ${dto.reviewedBy || "QA Engineer"}\n\n${dto.comment}`,
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `Could not update GitHub PR #${prNumber} on review: ${err.message}`,
+        );
+      }
+    }
+
+    const reviewedAt = new Date();
+    const reviewedBy = dto.reviewedBy || "user";
+
+    await this.prisma.healingProposal.update({
+      where: { id: proposal.id },
+      data: {
+        status: finalStatus,
+        prStatus: finalPrStatus,
+        reviewedBy,
+        reviewedAt,
+        scoringDetails: {
+          ...scoringDetails,
+          reviewComment: dto.comment,
+        },
+      },
+    });
+
+    return {
+      proposalId: proposal.id,
+      status: finalStatus,
+      prStatus: finalPrStatus,
+      prUrl: proposal.prUrl,
+      reviewedBy,
+      reviewedAt,
+      message: `Healing proposal successfully ${finalStatus}.`,
     };
   }
 

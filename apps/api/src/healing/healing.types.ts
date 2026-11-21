@@ -236,3 +236,41 @@ export interface PostCiCommentResult {
   isGreen: boolean;
   commentBody: string;
 }
+
+// ─── Task 4.12 Types (Auto-Safe Mode & Review) ────────────────────────────────
+
+export interface ReviewProposalResult {
+  proposalId: string;
+  status: "approved" | "rejected" | "auto_merged";
+  prStatus: "merged" | "closed" | "open";
+  prUrl?: string | null;
+  reviewedBy: string;
+  reviewedAt: Date;
+  message: string;
+}
+
+// ─── Task 4.13 Types (Healing Analytics) ──────────────────────────────────────
+
+export interface HealingAnalytics {
+  projectId: string;
+  totalHealsAttempted: number;
+  healsApproved: number;
+  healsAutoMerged: number;
+  healsRejected: number;
+  healsPending: number;
+  successRate: number; // 0 - 100 percentage
+  averageConfidence: number; // 0 - 100 percentage
+  timeSavedMinutes: number;
+  timeSavedHours: number;
+  autoSafeModeEnabled: boolean;
+  tierBreakdown: Record<string, number>;
+  recentProposals: Array<{
+    id: string;
+    oldLocator: string;
+    selectedLocator: string | null;
+    confidenceScore: number;
+    status: string;
+    prUrl?: string | null;
+    createdAt: Date;
+  }>;
+}

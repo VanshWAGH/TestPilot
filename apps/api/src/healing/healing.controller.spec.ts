@@ -159,6 +159,28 @@ describe("HealingController", () => {
     expect(res.isGreen).toBe(true);
   });
 
+  it("POST /projects/:projectId/heal/proposals/:proposalId/review delegates to service.reviewProposal", async () => {
+    service.reviewProposal = vi.fn().mockResolvedValue({
+      status: "approved",
+      prStatus: "merged",
+    });
+    const dto = { action: "approve" as const, reviewedBy: "lead" };
+    const res = await controller.reviewProposal("proj-1", "prop-1", dto);
+    expect(service.reviewProposal).toHaveBeenCalledWith("proj-1", "prop-1", dto);
+    expect(res.status).toBe("approved");
+  });
+
+  it("GET /projects/:projectId/heal/analytics delegates to service.getAnalytics", async () => {
+    service.getAnalytics = vi.fn().mockResolvedValue({
+      totalHealsAttempted: 5,
+      successRate: 100,
+      timeSavedHours: 2.5,
+    });
+    const res = await controller.getAnalytics("proj-1");
+    expect(service.getAnalytics).toHaveBeenCalledWith("proj-1");
+    expect(res.totalHealsAttempted).toBe(5);
+  });
+
   it("GET /projects/:projectId/heal/proposals delegates to service.listProposals", async () => {
     const res = await controller.listProposals("proj-1", "pending_review");
     expect(service.listProposals).toHaveBeenCalledWith("proj-1", "pending_review");

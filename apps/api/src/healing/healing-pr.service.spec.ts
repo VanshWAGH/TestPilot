@@ -326,5 +326,107 @@ describe("HealingPrService", () => {
         }),
       );
     });
+
+    it("auto-merges PR in auto-safe mode when confidence >= 95% and CI is green", async () => {
+      mockPrisma.healingProposal.findFirst.mockResolvedValueOnce({
+        id: PROPOSAL_ID,
+        projectId: PROJECT_ID,
+        oldLocator: 'button[data-test="old"]',
+        selectedLocator: 'button[data-test="new"]',
+        confidenceScore: 96,
+        status: "pending_review",
+        scoringDetails: { prNumber: 42 },
+        project: {
+          githubTestRepo: "owner/repo",
+          autoHealMode: "auto-safe",
+        },
+      });
+
+      mockOctokit.pulls.merge = vi.fn().mockResolvedValue({ data: { merged: true } });
+
+      await service.postCiResultsComment(
+        PROJECT_ID,
+        PROPOSAL_ID,
+        { testRunId: TEST_RUN_ID },
+      );
+
+      expect(mockOctokit.pulls.merge).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: "owner",
+          repo: "repo",
+          pull_number: 42,
+          merge_method: "squash",
+        }),
+      );
+
+      expect(mockPrisma.healingProposal.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "auto_merged",
+            prStatus: "merged",
+            reviewedBy: "auto-safe-engine",
+          }),
+        }),
+      );
+    });
+  });
+
+  // ─── Task 4.12: reviewProposal ─────────────────────────────────────────────
+
+  describe("reviewProposal()", () => {
+    it("approves proposal and merges PR on GitHub", async () => {
+      mockOctokit.pulls.merge = vi.fn().mockResolvedValue({ data: { merged: true } });
+
+      const res = await service.reviewProposal(PROJECT_ID, PROPOSAL_ID, {
+        action: "approve",
+        reviewedBy: "qa-lead@testpilot.com",
+        comment: "Looks solid",
+      });
+
+      expect(res.status).toBe("approved");
+      expect(res.prStatus).toBe("merged");
+      expect(mockOctokit.pulls.merge).toHaveBeenCalled();
+      expect(mockOctokit.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining("Approved"),
+        }),
+      );
+      expect(mockPrisma.healingProposal.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "approved",
+            prStatus: "merged",
+            reviewedBy: "qa-lead@testpilot.com",
+          }),
+        }),
+      );
+    });
+
+    it("rejects proposal and closes PR on GitHub", async () => {
+      mockOctokit.pulls.update = vi.fn().mockResolvedValue({ data: { state: "closed" } });
+
+      const res = await service.reviewProposal(PROJECT_ID, PROPOSAL_ID, {
+        action: "reject",
+        reviewedBy: "qa-lead@testpilot.com",
+        comment: "Element does not match expected flow",
+      });
+
+      expect(res.status).toBe("rejected");
+      expect(res.prStatus).toBe("closed");
+      expect(mockOctokit.pulls.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pull_number: 42,
+          state: "closed",
+        }),
+      );
+      expect(mockPrisma.healingProposal.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "rejected",
+            prStatus: "closed",
+          }),
+        }),
+      );
+    });
   });
 });

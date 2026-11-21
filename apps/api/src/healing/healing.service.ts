@@ -27,6 +27,8 @@ import {
   CreateHealingPrResult,
   TriggerHealingCiResult,
   PostCiCommentResult,
+  ReviewProposalResult,
+  HealingAnalytics,
 } from "./healing.types";
 import {
   TriggerHealingDto,
@@ -40,6 +42,7 @@ import {
   CreateHealingPrDto,
   TriggerHealingCiDto,
   PostCiCommentDto,
+  ReviewProposalDto,
 } from "./dto/trigger-healing.dto";
 import { FingerprintComparatorService } from "./fingerprint-comparator.service";
 import { CandidateLocatorGeneratorService } from "./candidate-generator.service";
@@ -888,6 +891,110 @@ export class HealingService {
       proposalId,
       dto,
     );
+  }
+
+  // ─── Task 4.12 — Review Proposal (Approve / Reject) ───────────────────────
+
+  /**
+   * Reviews a proposal manually (approving and merging PR or rejecting and closing).
+   */
+  async reviewProposal(
+    projectId: string,
+    proposalId: string,
+    dto: ReviewProposalDto,
+  ): Promise<ReviewProposalResult> {
+    return this.healingPrService!.reviewProposal(projectId, proposalId, dto);
+  }
+
+  // ─── Task 4.13 — Healing Analytics ────────────────────────────────────────
+
+  /**
+   * Computes healing analytics and metrics for the project.
+   */
+  async getAnalytics(projectId: string): Promise<HealingAnalytics> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { autoHealMode: true },
+    });
+
+    const proposals = await this.prisma.healingProposal.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const totalHealsAttempted = proposals.length;
+    let healsApproved = 0;
+    let healsAutoMerged = 0;
+    let healsRejected = 0;
+    let healsPending = 0;
+    let totalConfidence = 0;
+
+    const tierBreakdown: Record<string, number> = {
+      getByTestId: 0,
+      getByRole: 0,
+      getByLabel: 0,
+      getByText: 0,
+      css: 0,
+      xpath: 0,
+    };
+
+    for (const p of proposals) {
+      if (p.status === "approved") healsApproved++;
+      else if (p.status === "auto_merged") healsAutoMerged++;
+      else if (p.status === "rejected") healsRejected++;
+      else healsPending++;
+
+      totalConfidence += p.confidenceScore;
+
+      const candidates = (p.candidateLocators as any[]) || [];
+      const chosen =
+        candidates.find((c) => c.selector === p.selectedLocator) ||
+        candidates[0];
+      if (chosen?.type && tierBreakdown[chosen.type] !== undefined) {
+        tierBreakdown[chosen.type]++;
+      }
+    }
+
+    const resolved = healsApproved + healsAutoMerged + healsRejected;
+    const successful = healsApproved + healsAutoMerged;
+    const successRate =
+      resolved > 0
+        ? Math.round((successful / resolved) * 100)
+        : totalHealsAttempted > 0
+          ? 100
+          : 0;
+    const averageConfidence =
+      totalHealsAttempted > 0
+        ? Number((totalConfidence / totalHealsAttempted).toFixed(1))
+        : 0;
+    const timeSavedMinutes = successful * 30; // ~30 min saved per manual locator fix
+    const timeSavedHours = Number((timeSavedMinutes / 60).toFixed(1));
+
+    const recentProposals = proposals.slice(0, 10).map((p) => ({
+      id: p.id,
+      oldLocator: p.oldLocator,
+      selectedLocator: p.selectedLocator,
+      confidenceScore: p.confidenceScore,
+      status: p.status,
+      prUrl: p.prUrl,
+      createdAt: p.createdAt,
+    }));
+
+    return {
+      projectId,
+      totalHealsAttempted,
+      healsApproved,
+      healsAutoMerged,
+      healsRejected,
+      healsPending,
+      successRate,
+      averageConfidence,
+      timeSavedMinutes,
+      timeSavedHours,
+      autoSafeModeEnabled: project?.autoHealMode === "auto-safe",
+      tierBreakdown,
+      recentProposals,
+    };
   }
 
   // ─── Query Healing Proposals (For UI / Task 4.11) ─────────────────────────

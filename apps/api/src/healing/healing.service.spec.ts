@@ -714,6 +714,64 @@ describe("HealingService", () => {
       const comment = await service.postCiResultsComment(PROJECT_ID, "prop-1");
       expect(comment.isGreen).toBe(true);
     });
+
+    it("delegates reviewProposal to HealingPrService", async () => {
+      (service as any).healingPrService = {
+        reviewProposal: vi.fn().mockResolvedValue({
+          proposalId: "prop-1",
+          status: "approved",
+          prStatus: "merged",
+        }),
+      };
+
+      const res = await service.reviewProposal(PROJECT_ID, "prop-1", {
+        action: "approve",
+      });
+      expect(res.status).toBe("approved");
+    });
+  });
+
+  // ─── Task 4.13 — getAnalytics ──────────────────────────────────────────────
+
+  describe("getAnalytics()", () => {
+    it("computes totals, rates, and time saved for project proposals", async () => {
+      prisma.healingProposal.findMany.mockResolvedValueOnce([
+        {
+          id: "p1",
+          status: "auto_merged",
+          confidenceScore: 98,
+          selectedLocator: '[data-test="btn"]',
+          candidateLocators: [{ selector: '[data-test="btn"]', type: "getByTestId" }],
+        },
+        {
+          id: "p2",
+          status: "approved",
+          confidenceScore: 90,
+          selectedLocator: 'role=button[name="Submit"]',
+          candidateLocators: [{ selector: 'role=button[name="Submit"]', type: "getByRole" }],
+        },
+        {
+          id: "p3",
+          status: "rejected",
+          confidenceScore: 60,
+          selectedLocator: 'text="Click"',
+          candidateLocators: [{ selector: 'text="Click"', type: "getByText" }],
+        },
+      ]);
+
+      const analytics = await service.getAnalytics(PROJECT_ID);
+
+      expect(analytics.totalHealsAttempted).toBe(3);
+      expect(analytics.healsApproved).toBe(1);
+      expect(analytics.healsAutoMerged).toBe(1);
+      expect(analytics.healsRejected).toBe(1);
+      expect(analytics.healsPending).toBe(0);
+      expect(analytics.successRate).toBe(67); // 2/3 = 67%
+      expect(analytics.timeSavedMinutes).toBe(60); // 2 * 30 min
+      expect(analytics.timeSavedHours).toBe(1.0);
+      expect(analytics.tierBreakdown.getByTestId).toBe(1);
+      expect(analytics.tierBreakdown.getByRole).toBe(1);
+    });
   });
 
   // ─── listProposals / getProposal ───────────────────────────────────────────

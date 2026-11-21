@@ -31,6 +31,7 @@ import {
   CreateHealingPrDto,
   TriggerHealingCiDto,
   PostCiCommentDto,
+  ReviewProposalDto,
 } from "./dto/trigger-healing.dto";
 import { AuthGuard } from "../auth/auth.guard";
 
@@ -279,6 +280,47 @@ export class HealingController {
     @Body() dto: PostCiCommentDto,
   ): Promise<any> {
     return this.healingService.postCiResultsComment(projectId, proposalId, dto);
+  }
+
+  /**
+   * POST /projects/:projectId/heal/proposals/:proposalId/review
+   * Task 4.12 & 4.11 — Review proposal: Approve & Merge or Reject & Close.
+   */
+  @Post("proposals/:proposalId/review")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Review healing proposal (Task 4.12 & 4.11)",
+    description:
+      "Approve to merge the GitHub PR and accept the self-healed locator, or reject to close the PR and discard the proposal.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiParam({ name: "proposalId", type: String, description: "UUID of the healing proposal" })
+  @ApiResponse({ status: 200, description: "Review decision processed" })
+  @ApiResponse({ status: 404, description: "Proposal not found" })
+  async reviewProposal(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("proposalId", ParseUUIDPipe) proposalId: string,
+    @Body() dto: ReviewProposalDto,
+  ): Promise<any> {
+    return this.healingService.reviewProposal(projectId, proposalId, dto);
+  }
+
+  /**
+   * GET /projects/:projectId/heal/analytics
+   * Task 4.13 — Healing Analytics dashboard metrics.
+   */
+  @Get("analytics")
+  @ApiOperation({
+    summary: "Get healing analytics and ROI metrics (Task 4.13)",
+    description:
+      "Returns total heals attempted, success rate, average confidence score, auto-merged count, time saved in minutes and hours, and locator tier breakdown.",
+  })
+  @ApiParam({ name: "projectId", type: String, description: "UUID of the project" })
+  @ApiResponse({ status: 200, description: "Healing analytics metrics" })
+  async getAnalytics(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ): Promise<any> {
+    return this.healingService.getAnalytics(projectId);
   }
 
   /**
