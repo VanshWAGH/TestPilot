@@ -117,6 +117,19 @@ export class FingerprintComparatorService {
       }
     }
 
+    // 5b. Check CSS class names: button.export-btn or .btn-export
+    const classMatches = clean.match(/\.([a-zA-Z0-9_-]+)/g);
+    if (classMatches) {
+      const classes = classMatches.map((c) => c.slice(1));
+      profile.attributes!["class"] = classes.join(" ");
+      if (!profile.testId) {
+        const idLikeClass = classes.find((c) => c.includes("-") || c.length > 3);
+        if (idLikeClass) {
+          profile.testId = idLikeClass;
+        }
+      }
+    }
+
     // 6. Check tag
     const tagMatch = clean.match(/^([a-zA-Z][a-zA-Z0-9]*)/);
     if (tagMatch && !["page", "locator"].includes(tagMatch[1])) {
@@ -188,8 +201,16 @@ export class FingerprintComparatorService {
       }
     } else if (!oldName && !freshName) {
       accessibleNameScore = 0.5; // neutral
+    } else if (!oldName && freshName) {
+      const oldLocator = (oldEl.primaryLocator || oldEl.testId || "").toLowerCase();
+      if (oldLocator && this.hasTokenOverlap(oldLocator, freshName)) {
+        accessibleNameScore = 0.8;
+        reasons.push(`Accessible name overlaps locator keywords: "${fresh.accessibleName}"`);
+      } else {
+        accessibleNameScore = 0.4;
+      }
     } else {
-      accessibleNameScore = 0.1;
+      accessibleNameScore = 0.2;
     }
 
     // 4. Test ID / Identifier Similarity (Weight: 25%)
@@ -212,8 +233,16 @@ export class FingerprintComparatorService {
       }
     } else if (!oldTestId && !freshTestId) {
       testIdScore = 0.5; // neutral
+    } else if (!oldTestId && freshTestId) {
+      const oldLocator = (oldEl.primaryLocator || "").toLowerCase();
+      if (oldLocator && this.hasTokenOverlap(oldLocator, freshTestId)) {
+        testIdScore = 0.85;
+        reasons.push(`Test-id matches locator keywords: "${freshTestId}"`);
+      } else {
+        testIdScore = 0.4;
+      }
     } else {
-      testIdScore = 0.1;
+      testIdScore = 0.2;
     }
 
     // 5. Text Content Similarity (Weight: 10%)
@@ -233,6 +262,14 @@ export class FingerprintComparatorService {
       }
     } else if (!oldText && !freshText) {
       textScore = 0.5;
+    } else if (!oldText && freshText) {
+      const oldLocator = (oldEl.primaryLocator || oldEl.testId || "").toLowerCase();
+      if (oldLocator && this.hasTokenOverlap(oldLocator, freshText)) {
+        textScore = 0.8;
+        reasons.push(`Text content overlaps locator keywords: "${fresh.textContent?.slice(0, 30)}"`);
+      } else {
+        textScore = 0.4;
+      }
     } else {
       textScore = 0.2;
     }
@@ -344,5 +381,11 @@ export class FingerprintComparatorService {
     }
 
     return commonPrefix / maxParts;
+  }
+
+  private hasTokenOverlap(s1: string, s2: string): boolean {
+    const tokens1 = s1.split(/[^a-zA-Z0-9]+/).filter((t) => t.length > 2);
+    const tokens2 = new Set(s2.split(/[^a-zA-Z0-9]+/).map((t) => t.toLowerCase()));
+    return tokens1.some((t) => tokens2.has(t.toLowerCase()));
   }
 }

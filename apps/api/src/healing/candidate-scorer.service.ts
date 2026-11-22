@@ -165,11 +165,24 @@ export class CandidateScorerService {
     let subtreeModifier = 0;
     let sameSubtree = false;
 
-    if (originalSubtree && candidate.selector) {
-      if (
-        candidate.selector.startsWith(originalSubtree) ||
-        (candidate.strategy && candidate.strategy.includes("DOM path"))
-      ) {
+    if (originalSubtree) {
+      const matched = this.findMatchingElement(candidate, elements);
+      if (matched && matched.domPath) {
+        const matchedSubtree = this.extractSubtreePrefix(matched.domPath);
+        if (
+          matchedSubtree === originalSubtree ||
+          matched.domPath.startsWith(originalSubtree) ||
+          originalSubtree.startsWith(matchedSubtree || "")
+        ) {
+          subtreeModifier = 3;
+          sameSubtree = true;
+          reasons.push("Preserved original DOM subtree (+3)");
+        }
+      } else if (candidate.selector && candidate.selector.startsWith(originalSubtree)) {
+        subtreeModifier = 3;
+        sameSubtree = true;
+        reasons.push("Preserved original DOM subtree (+3)");
+      } else if (candidate.strategy && candidate.strategy.includes("DOM path")) {
         subtreeModifier = 3;
         sameSubtree = true;
         reasons.push("Preserved original DOM subtree (+3)");
@@ -238,6 +251,52 @@ export class CandidateScorerService {
 
     // Default to 1 if heuristic couldn't find a direct match
     return matches > 0 ? matches : 1;
+  }
+
+  private findMatchingElement(
+    candidate: CandidateLocator,
+    elements: ExtractedElement[],
+  ): ExtractedElement | null {
+    const cleanLocator = candidate.locator;
+    for (const el of elements) {
+      if (candidate.type === "getByTestId") {
+        const testIdMatch = cleanLocator.match(/getByTestId\(['"](.+?)['"]\)/);
+        const testId = testIdMatch ? testIdMatch[1] : null;
+        if (testId && (el.testId === testId || el.attributes?.["data-testid"] === testId || el.attributes?.["data-test"] === testId)) {
+          return el;
+        }
+      } else if (candidate.type === "getByRole") {
+        const roleMatch = cleanLocator.match(/getByRole\(['"](.+?)['"]/);
+        const nameMatch = cleanLocator.match(/name:\s*['"](.+?)['"]/);
+        if (roleMatch && el.role === roleMatch[1]) {
+          if (!nameMatch || el.accessibleName === nameMatch[1] || el.textContent === nameMatch[1]) {
+            return el;
+          }
+        }
+      } else if (candidate.type === "getByLabel") {
+        const labelMatch = cleanLocator.match(/getByLabel\(['"](.+?)['"]\)/);
+        if (labelMatch && (el.accessibleName === labelMatch[1] || el.attributes?.["aria-label"] === labelMatch[1])) {
+          return el;
+        }
+      } else if (candidate.type === "getByText") {
+        const textMatch = cleanLocator.match(/getByText\(['"](.+?)['"]\)/);
+        if (textMatch && el.textContent?.includes(textMatch[1])) {
+          return el;
+        }
+      } else if (candidate.type === "css") {
+        if (candidate.selector.startsWith("#")) {
+          const id = candidate.selector.slice(1);
+          if (el.attributes?.["id"] === id || el.domPath?.includes(`#${id}`)) return el;
+        } else if (el.domPath === candidate.selector || el.primaryLocator === candidate.locator) {
+          return el;
+        }
+      } else if (candidate.type === "xpath") {
+        if (el.primaryLocator === candidate.locator || el.fallbackLocators?.includes(candidate.selector)) {
+          return el;
+        }
+      }
+    }
+    return elements[0] || null;
   }
 
   private extractSubtreePrefix(domPath?: string | null): string | null {
