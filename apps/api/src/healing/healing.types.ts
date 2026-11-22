@@ -1,0 +1,276 @@
+import { ExtractedElement } from "../crawler/utils/dom-extractor";
+
+export interface HealingJobData {
+  testRunId: string;
+  testResultId: string;
+  projectId: string;
+  scenarioId?: string | null;
+  failedLocator?: string | null;
+  failedStepNumber?: number | null;
+  errorMessage?: string | null;
+  pageId?: string | null;
+  targetUrl?: string | null;
+  environmentId?: string | null;
+}
+
+export interface FreshDomCaptureResult {
+  pageId: string;
+  url: string;
+  title: string;
+  domHtml: string;
+  accessibilityTree: unknown;
+  domFingerprint: string;
+  accessibilityFingerprint: string;
+  elementsCount: number;
+  elements: ExtractedElement[];
+  screenshotUrl: string | null;
+  snapshotId: string;
+  capturedAt: Date;
+}
+
+export interface EnqueueHealingResult {
+  jobId: string;
+  status: "queued";
+  testResultId: string;
+  projectId: string;
+  failedLocator?: string | null;
+  targetUrl?: string | null;
+  message: string;
+}
+
+// ─── Task 4.3 Types ──────────────────────────────────────────────────────────
+
+export interface OldElementProfile {
+  id?: string;
+  tag?: string;
+  role?: string | null;
+  accessibleName?: string | null;
+  testId?: string | null;
+  textContent?: string | null;
+  primaryLocator?: string | null;
+  fallbackLocators?: string[];
+  domFingerprint?: string | null;
+  domPath?: string | null;
+  attributes?: Record<string, string>;
+}
+
+export interface ElementMatchDetail {
+  element: ExtractedElement;
+  score: number; // 0.0 - 1.0 (or 0-100)
+  confidence: number; // percentage 0 - 100
+  matchedSignals: {
+    tagMatch: number;
+    roleMatch: number;
+    accessibleNameMatch: number;
+    testIdMatch: number;
+    textContentMatch: number;
+    domPathMatch: number;
+  };
+  reasons: string[];
+}
+
+export interface ElementComparisonResult {
+  matchedElement: ExtractedElement | null;
+  confidenceScore: number;
+  isConfidentMatch: boolean;
+  oldElement: OldElementProfile;
+  totalElementsScanned: number;
+  topMatches: ElementMatchDetail[];
+  message: string;
+}
+
+// ─── Task 4.4 Types ──────────────────────────────────────────────────────────
+
+export type LocatorLadderTier =
+  | "getByTestId"
+  | "getByRole"
+  | "getByLabel"
+  | "getByText"
+  | "css"
+  | "xpath";
+
+export interface CandidateLocator {
+  locator: string; // e.g. `page.getByRole("button", { name: "Add to cart" })`
+  selector: string; // e.g. `role=button[name="Add to cart"]` or `button[data-test="add-to-cart"]`
+  type: LocatorLadderTier;
+  tier: number; // 1 to 6
+  score: number; // base score (+10, +8, +6, +4, +2, +1)
+  strategy: string; // description of ladder rule used
+  isPlaywrightMethod: boolean;
+}
+
+export interface GenerateCandidatesResult {
+  elementId?: string | null;
+  elementTag: string;
+  candidatesCount: number;
+  candidates: CandidateLocator[];
+  recommendedCandidate: CandidateLocator;
+  summary: string;
+}
+
+// ─── Task 4.5 Types (Deterministic Scoring) ───────────────────────────────────
+
+export interface ScoringBreakdown {
+  baseScore: number; // +10, +8, +6, +4, +2, +1
+  uniquenessModifier: number; // +5 for unique match, -5 for multiple matches
+  subtreeModifier: number; // +3 if in same DOM subtree
+  matchCount: number;
+  isUnique: boolean;
+  sameSubtree: boolean;
+  reasons: string[];
+}
+
+export interface ScoredCandidateLocator extends CandidateLocator {
+  totalScore: number;
+  confidenceScore: number; // 0-100%
+  scoringDetails: ScoringBreakdown;
+}
+
+export interface DeterministicScoringResult {
+  scoredCandidates: ScoredCandidateLocator[];
+  topCandidate: ScoredCandidateLocator;
+  runnerUpCandidate: ScoredCandidateLocator | null;
+  scoreGap: number;
+  isAmbiguous: boolean; // true if scoreGap <= 2
+}
+
+// ─── Task 4.6 Types (LLM Tie-Breaking) ───────────────────────────────────────
+
+export interface TieBreakResult {
+  llmUsed: boolean;
+  modelUsed?: string;
+  selectedCandidate: ScoredCandidateLocator;
+  runnerUpCandidate?: ScoredCandidateLocator | null;
+  llmReasoning?: string;
+  scoreGapBefore: number;
+  scoreGapAfter: number;
+  candidates: ScoredCandidateLocator[];
+  message: string;
+}
+
+// ─── Task 4.7 Types (Candidate Validation) ────────────────────────────────────
+
+export interface ValidatedCandidateLocator extends ScoredCandidateLocator {
+  validationStatus: "passed" | "failed" | "skipped";
+  validationError?: string;
+  matchCount?: number; // how many elements on the page matched
+  isVisible?: boolean;
+}
+
+export interface CandidateValidationResult {
+  targetUrl: string;
+  totalCandidates: number;
+  passedCount: number;
+  failedCount: number;
+  validatedCandidates: ValidatedCandidateLocator[];
+  bestCandidate: ValidatedCandidateLocator | null;
+  validatedAt: Date;
+}
+
+// ─── Task 4.8 Types (Healing Proposal Record) ────────────────────────────────
+
+export interface DomElementDiff {
+  elementId?: string | null;
+  oldLocator: string | null;
+  oldDomPath?: string | null;
+  oldTag?: string | null;
+  oldRole?: string | null;
+  oldAccessibleName?: string | null;
+  newLocator: string | null;
+  newDomPath?: string | null;
+  newTag?: string | null;
+  newRole?: string | null;
+  newAccessibleName?: string | null;
+  changedFields: string[];
+}
+
+export interface HealingProposalRecord {
+  id: string;
+  projectId: string;
+  testResultId: string;
+  elementId?: string | null;
+  oldLocator: string;
+  selectedLocator: string | null;
+  candidateLocators: ValidatedCandidateLocator[];
+  confidenceScore: number;
+  validationResult: "passed" | "failed" | null;
+  llmUsed: boolean;
+  status: string;
+  domDiff?: DomElementDiff | null;
+  oldScreenshotUrl?: string | null;
+  newScreenshotUrl?: string | null;
+  createdAt: Date;
+}
+
+// ─── Task 4.9 Types (Healing Branch & PR) ────────────────────────────────────
+
+export interface CreateHealingPrResult {
+  proposalId: string;
+  branch: string;
+  prUrl: string;
+  prNumber: number;
+  commitSha: string;
+  pageObjectPath: string;
+  oldLocator: string;
+  newLocator: string;
+  confidenceScore: number;
+  status: string;
+}
+
+// ─── Task 4.10 Types (Healing PR CI Check) ───────────────────────────────────
+
+export interface TriggerHealingCiResult {
+  proposalId: string;
+  testRunId: string;
+  branch: string;
+  status: string;
+  workflowDispatchUrl: string;
+  message: string;
+}
+
+export interface PostCiCommentResult {
+  proposalId: string;
+  prNumber: number;
+  commentUrl?: string;
+  ciStatus: "ci_passed" | "ci_failed";
+  isGreen: boolean;
+  commentBody: string;
+}
+
+// ─── Task 4.12 Types (Auto-Safe Mode & Review) ────────────────────────────────
+
+export interface ReviewProposalResult {
+  proposalId: string;
+  status: "approved" | "rejected" | "auto_merged";
+  prStatus: "merged" | "closed" | "open";
+  prUrl?: string | null;
+  reviewedBy: string;
+  reviewedAt: Date;
+  message: string;
+}
+
+// ─── Task 4.13 Types (Healing Analytics) ──────────────────────────────────────
+
+export interface HealingAnalytics {
+  projectId: string;
+  totalHealsAttempted: number;
+  healsApproved: number;
+  healsAutoMerged: number;
+  healsRejected: number;
+  healsPending: number;
+  successRate: number; // 0 - 100 percentage
+  averageConfidence: number; // 0 - 100 percentage
+  timeSavedMinutes: number;
+  timeSavedHours: number;
+  autoSafeModeEnabled: boolean;
+  tierBreakdown: Record<string, number>;
+  recentProposals: Array<{
+    id: string;
+    oldLocator: string;
+    selectedLocator: string | null;
+    confidenceScore: number;
+    status: string;
+    prUrl?: string | null;
+    createdAt: Date;
+  }>;
+}

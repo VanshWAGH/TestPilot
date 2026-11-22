@@ -40,12 +40,20 @@ export class TriggerRunDto {
   browser?: string;
 
   @ApiPropertyOptional({
+    description: "Specific Git branch or ref to dispatch regression workflow on.",
+    example: "heal/DEF-104-update-locator",
+  })
+  @IsOptional()
+  @IsString()
+  branch?: string;
+
+  @ApiPropertyOptional({
     description: "How the run was triggered.",
-    enum: ["manual", "schedule", "webhook"],
+    enum: ["manual", "schedule", "webhook", "healing_ci"],
     default: "manual",
   })
   @IsOptional()
-  @IsEnum(["manual", "schedule", "webhook"])
+  @IsEnum(["manual", "schedule", "webhook", "healing_ci"])
   triggerType?: string;
 }
 

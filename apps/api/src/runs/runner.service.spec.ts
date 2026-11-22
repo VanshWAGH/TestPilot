@@ -19,6 +19,7 @@ const mockPrisma = {
     create: vi.fn(),
     update: vi.fn(),
     findFirst: vi.fn(),
+    findUnique: vi.fn(),
     findMany: vi.fn(),
     count: vi.fn(),
   },
