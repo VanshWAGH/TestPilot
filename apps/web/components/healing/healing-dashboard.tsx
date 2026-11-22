@@ -782,15 +782,13 @@ export function HealingDashboard({ initialProjects }: HealingDashboardProps) {
                         <div className="bg-rose-950/40 text-rose-300 px-2 py-0.5 rounded flex items-center gap-2">
                           <span>-</span>
                           <span>
-                            readonly targetElement = page.locator('
-                            {proposal.oldLocator}');
+                            {`readonly targetElement = page.locator('${proposal.oldLocator}');`}
                           </span>
                         </div>
                         <div className="bg-emerald-950/40 text-emerald-300 px-2 py-0.5 rounded flex items-center gap-2">
                           <span>+</span>
                           <span>
-                            readonly targetElement = page.locator('
-                            {proposal.selectedLocator}');
+                            {`readonly targetElement = page.locator('${proposal.selectedLocator}');`}
                           </span>
                         </div>
                       </div>
