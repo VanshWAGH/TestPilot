@@ -14,6 +14,7 @@ import { GitHubModule } from "./github/github.module";
 import { RunsModule } from "./runs/runs.module";
 import { BaselinesModule } from "./baselines/baselines.module";
 import { HealingModule } from "./healing/healing.module";
+import { DefectsModule } from "./defects/defects.module";
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { HealingModule } from "./healing/healing.module";
     RunsModule,
     BaselinesModule,
     HealingModule,
+    DefectsModule,
   ],
 })
 export class AppModule {}

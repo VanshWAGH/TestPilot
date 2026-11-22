@@ -345,27 +345,49 @@ model HealingProposal {
 }
 
 model Defect {
-  id                   String    @id @default(uuid())
-  projectId            String    @map("project_id")
-  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  externalSystem       String    @default("github_issues") @map("external_system")
-  externalId           String    @map("external_id")
-  externalUrl          String?   @map("external_url")
+  id                   String          @id @default(uuid())
+  projectId            String          @map("project_id")
+  project              Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  externalSystem       String          @default("github_issues") @map("external_system")
+  externalId           String          @map("external_id")
+  externalUrl          String?         @map("external_url")
   title                String
   description          String
-  severity             String    @default("medium") // critical, high, medium, low
-  status               String    @default("open") // open, in_progress, ready_for_qa, qa_passed, qa_failed, closed
-  failureRunId         String?   @map("failure_run_id")
-  verificationLabel    String?   @default("ready-for-qa") @map("verification_label")
-  verificationAttempts Int       @default(0) @map("verification_attempts")
-  createdByPlatform    Boolean   @default(true) @map("created_by_platform")
-  closedAt             DateTime? @map("closed_at")
-  createdAt            DateTime  @default(now()) @map("created_at")
+  severity             String          @default("medium") // critical, high, medium, low
+  status               String          @default("open") // open, in_progress, ready_for_qa, qa_passed, qa_failed, closed
+  failureRunId         String?         @map("failure_run_id")
+  verificationLabel    String?         @default("ready-for-qa") @map("verification_label")
+  verificationAttempts Int             @default(0) @map("verification_attempts")
+  createdByPlatform    Boolean         @default(true) @map("created_by_platform")
+  closedAt             DateTime?       @map("closed_at")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  testLinks            DefectTestLink[]
 
   @@index([projectId])
   @@index([projectId, status])
   @@index([externalSystem, externalId])
   @@map("defects")
+}
+
+// ─── Task 5.2: Defect-Test Link ─────────────────────────────────────────────
+
+model DefectTestLink {
+  id           String   @id @default(uuid())
+  defectId     String   @map("defect_id")
+  defect       Defect   @relation(fields: [defectId], references: [id], onDelete: Cascade)
+  projectId    String   @map("project_id")
+  testResultId String   @map("test_result_id")
+  testFilePath String   @map("test_file_path")
+  tagAdded     String   @map("tag_added") // e.g. @DEFECT-123
+  commitSha    String?  @map("commit_sha")
+  branch       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([defectId, testResultId])
+  @@index([defectId])
+  @@index([projectId])
+  @@index([testResultId])
+  @@map("defect_test_links")
 }
 
 model GitHubInstallation {
