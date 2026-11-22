@@ -355,8 +355,8 @@ testpilot/
 
 | # | Task | Details | Output |
 |---|------|---------|--------|
-| 5.1 | **Defect creation** | When failure classifier identifies "product defect": create GitHub Issue (or Jira ticket) with: test name, environment, URL, steps to reproduce, expected vs. actual, trace link, screenshot, video link, console errors, HAR link, severity suggestion (from LLM). | Defect filed |
-| 5.2 | **Defect-test linking** | Add `@DEFECT-<id>` tag to the affected Playwright test file. Commit to test repo. Store mapping in `defect_test_links`. | Tag added to test |
+| 5.1 | **Defect creation** | When failure classifier identifies "product defect": create GitHub Issue (or Jira ticket) with: test name, environment, URL, steps to reproduce, expected vs. actual, trace link, screenshot, video link, console errors, HAR link, severity suggestion (from LLM). | ✅ **Completed** (Implemented `DefectCreationService` in `apps/api/src/defects/defect-creation.service.ts`: files GitHub Issue with full evidence [test name, environment, URL, steps to reproduce, expected vs. actual, trace link, screenshot, video link, console errors, HAR link, LLM severity suggestion with heuristic fallback], prevents duplicate filings, and persists Defect record in DB; exposed via `POST /api/projects/:projectId/defects`) |
+| 5.2 | **Defect-test linking** | Add `@DEFECT-<id>` tag to the affected Playwright test file. Commit to test repo. Store mapping in `defect_test_links`. | ✅ **Completed** (Implemented `DefectTestLinkService` in `apps/api/src/defects/defect-test-link.service.ts`: injects `@DEFECT-<id>` tag into `test.describe`/`test()` titles, commits patched test file to `defect/<id>-tag-test` branch on GitHub, and persists mapping in `defect_test_links` table with unique constraint; exposed via `POST /api/projects/:projectId/defects/:defectId/link`) |
 | 5.3 | **Defect tracking UI** | Table of all defects: title, severity, status (open/in-progress/ready-for-qa/verified/closed), linked tests, creation date, external link. | Defects viewable |
 | 5.4 | **GitHub webhook listener** | Listen for `issues.labeled` event. When `ready-for-qa` label is added, trigger verification. | Webhook received |
 | 5.5 | **Verification workflow** | `.github/workflows/defect-verification.yml` — runs only tests with `@DEFECT-<id>` tag, headed mode via Xvfb. Uploads new evidence. | Verification runs |
@@ -368,8 +368,8 @@ testpilot/
 
 #### Definition of Done
 - [ ] Simulate a real product bug on SauceDemo (e.g., cart count wrong)
-- [ ] Platform creates a GitHub Issue with full evidence
-- [ ] Test file gets `@DEFECT-<id>` tag
+- [x] Platform creates a GitHub Issue with full evidence
+- [x] Test file gets `@DEFECT-<id>` tag
 - [ ] Developer adds `ready-for-qa` label
 - [ ] Platform runs verification (headed)
 - [ ] Pass → issue closed with `qa-passed`
