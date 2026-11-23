@@ -22,7 +22,11 @@ describe("GitHubController", () => {
       getRepoStatus: vi.fn().mockResolvedValue({ isConfigured: true, connectedRepo: "owner/repo" }),
     };
 
-    controller = new GitHubController(mockService);
+    const mockWebhookService = {
+      handleWebhook: vi.fn().mockResolvedValue({ received: true, event: "issues" }),
+    };
+
+    controller = new GitHubController(mockService as any, mockWebhookService as any);
   });
 
   it("getAppInfo delegates to service", () => {

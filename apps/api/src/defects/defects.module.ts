@@ -1,14 +1,24 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { DefectsController } from "./defects.controller";
 import { DefectCreationService } from "./defect-creation.service";
 import { DefectTestLinkService } from "./defect-test-link.service";
+import { DefectVerificationResultService } from "./defect-verification-result.service";
 import { LlmModule } from "../llm/llm.module";
 import { AuthModule } from "../auth/auth.module";
+import { GitHubModule } from "../github/github.module";
 
 @Module({
-  imports: [LlmModule, AuthModule],
+  imports: [LlmModule, AuthModule, forwardRef(() => GitHubModule)],
   controllers: [DefectsController],
-  providers: [DefectCreationService, DefectTestLinkService],
-  exports: [DefectCreationService, DefectTestLinkService],
+  providers: [
+    DefectCreationService,
+    DefectTestLinkService,
+    DefectVerificationResultService,
+  ],
+  exports: [
+    DefectCreationService,
+    DefectTestLinkService,
+    DefectVerificationResultService,
+  ],
 })
 export class DefectsModule {}

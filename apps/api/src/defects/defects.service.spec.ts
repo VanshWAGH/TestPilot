@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DefectCreationService } from "./defect-creation.service";
 import { DefectTestLinkService } from "./defect-test-link.service";
+import { DefectsController } from "./defects.controller";
 
 // ─── Task 5.1 — DefectCreationService Tests ───────────────────────────────────
 
 describe("DefectCreationService", () => {
   let service: DefectCreationService;
-  let mockPrisma: Record<string, ReturnType<typeof vi.fn>>;
-  let mockLlm: Record<string, ReturnType<typeof vi.fn>>;
+  let mockPrisma: any;
+  let mockLlm: any;
 
   const PROJECT_ID = "proj-defect-test";
   const TEST_RESULT_ID = "result-defect-1";
@@ -226,7 +227,7 @@ describe("DefectCreationService", () => {
 
 describe("DefectTestLinkService", () => {
   let service: DefectTestLinkService;
-  let mockPrisma: Record<string, ReturnType<typeof vi.fn>>;
+  let mockPrisma: any;
 
   const PROJECT_ID = "proj-defect-test";
   const DEFECT_ID = "defect-new-1";
@@ -413,5 +414,63 @@ describe("DefectTestLinkService", () => {
     expect(mockPrisma.defectTestLink.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { defectId: DEFECT_ID } }),
     );
+  });
+});
+
+// ─── DefectsController Tests ──────────────────────────────────────────────────
+
+describe("DefectsController", () => {
+  let controller: DefectsController;
+  let mockCreation: any;
+  let mockLink: any;
+  let mockPrisma: any;
+  let mockWebhook: any;
+  let mockVerificationResult: any;
+
+  beforeEach(() => {
+    mockCreation = { createDefect: vi.fn() };
+    mockLink = { linkDefectToTest: vi.fn(), getLinksForDefect: vi.fn() };
+    mockPrisma = {
+      defect: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue({ id: "def-1", externalId: "123" }),
+        update: vi.fn().mockResolvedValue({ id: "def-1", status: "ready_for_qa" }),
+      },
+    };
+    mockWebhook = { triggerVerificationForDefect: vi.fn().mockResolvedValue({ testRunId: "run-1" }) };
+    mockVerificationResult = { handleResult: vi.fn().mockResolvedValue({ passed: true, issueAction: "closed" }) };
+
+    controller = new DefectsController(
+      mockCreation,
+      mockLink,
+      mockPrisma,
+      mockWebhook,
+      mockVerificationResult,
+    );
+  });
+
+  it("Task 5.3: lists all defects with filters", async () => {
+    await controller.listAllDefects("proj-1", "open", "high", "search-term");
+    expect(mockPrisma.defect.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          projectId: "proj-1",
+          status: "open",
+          severity: "high",
+        }),
+      }),
+    );
+  });
+
+  it("Task 5.6: delegates verification-result ingestion to DefectVerificationResultService", async () => {
+    const dto = {
+      defectId: "def-1",
+      defectTag: "@DEFECT-123",
+      workflowRunId: "run-100",
+      passed: true,
+    };
+    const res = await controller.handleVerificationResult(dto);
+    expect(mockVerificationResult.handleResult).toHaveBeenCalledWith(dto);
+    expect(res).toEqual({ passed: true, issueAction: "closed" });
   });
 });

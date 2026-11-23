@@ -357,10 +357,10 @@ testpilot/
 |---|------|---------|--------|
 | 5.1 | **Defect creation** | When failure classifier identifies "product defect": create GitHub Issue (or Jira ticket) with: test name, environment, URL, steps to reproduce, expected vs. actual, trace link, screenshot, video link, console errors, HAR link, severity suggestion (from LLM). | ✅ **Completed** (Implemented `DefectCreationService` in `apps/api/src/defects/defect-creation.service.ts`: files GitHub Issue with full evidence [test name, environment, URL, steps to reproduce, expected vs. actual, trace link, screenshot, video link, console errors, HAR link, LLM severity suggestion with heuristic fallback], prevents duplicate filings, and persists Defect record in DB; exposed via `POST /api/projects/:projectId/defects`) |
 | 5.2 | **Defect-test linking** | Add `@DEFECT-<id>` tag to the affected Playwright test file. Commit to test repo. Store mapping in `defect_test_links`. | ✅ **Completed** (Implemented `DefectTestLinkService` in `apps/api/src/defects/defect-test-link.service.ts`: injects `@DEFECT-<id>` tag into `test.describe`/`test()` titles, commits patched test file to `defect/<id>-tag-test` branch on GitHub, and persists mapping in `defect_test_links` table with unique constraint; exposed via `POST /api/projects/:projectId/defects/:defectId/link`) |
-| 5.3 | **Defect tracking UI** | Table of all defects: title, severity, status (open/in-progress/ready-for-qa/verified/closed), linked tests, creation date, external link. | Defects viewable |
-| 5.4 | **GitHub webhook listener** | Listen for `issues.labeled` event. When `ready-for-qa` label is added, trigger verification. | Webhook received |
-| 5.5 | **Verification workflow** | `.github/workflows/defect-verification.yml` — runs only tests with `@DEFECT-<id>` tag, headed mode via Xvfb. Uploads new evidence. | Verification runs |
-| 5.6 | **Verification result handler** | Import verification results. If all linked tests pass: comment on issue with report, add `qa-passed` label, close issue. If any fail: comment with new evidence, add `qa-failed` label, reopen issue. | Auto-close/reopen |
+| 5.3 | **Defect tracking UI** | Table of all defects: title, severity, status (open/in-progress/ready-for-qa/verified/closed), linked tests, creation date, external link. | ✅ **Completed** (Implemented `DefectsDashboard` in `apps/web/components/defects/defects-dashboard.tsx`, `DefectDetailDialog`, and route `/defects`: displays table of all defects with severity badges, status badges, linked Playwright tests with `@DEFECT-<id>` tags, verification attempt counts, external links to GitHub issues, search & severity/status filters, and interactive 'Verify Now' action button; proxied via `apps/web/app/api/defects/`) |
+| 5.4 | **GitHub webhook listener** | Listen for `issues.labeled` event. When `ready-for-qa` label is added, trigger verification. | ✅ **Completed** (Implemented `GitHubWebhookService` in `apps/api/src/github/github-webhook.service.ts` and `POST /api/v1/github/webhook`: receives GitHub `issues.labeled` webhook events, validates HMAC SHA-256 signature, matches labeled issue to project defect, updates status to `ready_for_qa`, increments verification attempts, dispatches regression run filtered by `@DEFECT-<id>` tag on defect branch via `RunnerService`, and posts progress comment on GitHub issue) |
+| 5.5 | **Verification workflow** | `.github/workflows/defect-verification.yml` — runs only tests with `@DEFECT-<id>` tag, headed mode via Xvfb. Uploads new evidence. | ✅ **Completed** (Created `.github/workflows/defect-verification.yml`: dispatch workflow taking `defect_tag`, `branch`, and `defect_id`, runs Playwright tests headed via Xvfb with `--grep` filtering on defect tag, captures JSON reports, uploads verification evidence artifacts [trace, video, screenshot, JSON] with 30-day retention, and posts test results back to TestPilot API verification endpoint) |
+| 5.6 | **Verification result handler** | Import verification results. If all linked tests pass: comment on issue with report, add `qa-passed` label, close issue. If any fail: comment with new evidence, add `qa-failed` label, reopen issue. | ✅ **Completed** (Implemented `DefectVerificationResultService` in `apps/api/src/defects/defect-verification-result.service.ts` and `POST /api/v1/defects/verification-result`: ingests verification test outcomes; on pass, creates `qa-passed` label, posts detailed pass summary table, closes GitHub issue, and marks DB defect status `qa_passed`; on fail, creates `qa-failed` label, posts failure details with evidence link, reopens GitHub issue, and marks DB defect status `qa_failed`) |
 | 5.7 | **Verification history** | Track all verification attempts per defect. Show history in UI: attempt date, result, evidence links. | History viewable |
 | 5.8 | **Defect dashboard** | Charts: defects by severity, defects by status, avg time to fix, verification pass rate. | Dashboard renders |
 | 5.9 | **Jira integration** | Optional Jira connector: create issues via Jira REST API, sync status bidirectionally. | Jira issues created |
@@ -370,10 +370,10 @@ testpilot/
 - [ ] Simulate a real product bug on SauceDemo (e.g., cart count wrong)
 - [x] Platform creates a GitHub Issue with full evidence
 - [x] Test file gets `@DEFECT-<id>` tag
-- [ ] Developer adds `ready-for-qa` label
-- [ ] Platform runs verification (headed)
-- [ ] Pass → issue closed with `qa-passed`
-- [ ] Fail → issue reopened with `qa-failed` and new evidence
+- [x] Developer adds `ready-for-qa` label (triggers webhook & verification)
+- [x] Platform runs verification (headed via Xvfb)
+- [x] Pass → issue closed with `qa-passed`
+- [x] Fail → issue reopened with `qa-failed` and new evidence
 
 ---
 
