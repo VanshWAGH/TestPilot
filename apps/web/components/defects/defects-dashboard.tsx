@@ -381,13 +381,15 @@ export function DefectsDashboard({ initialProjects = [] }: DefectsDashboardProps
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-primary hover:underline font-bold"
-                          title="Open GitHub Issue"
+                          title={defect.externalSystem === "jira" ? "Open Jira Issue" : "Open GitHub Issue"}
                         >
-                          <span>#{defect.externalId}</span>
+                          <span>{defect.externalSystem === "jira" ? defect.externalId : `#${defect.externalId}`}</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       ) : (
-                        <span className="text-muted-foreground">#{defect.externalId}</span>
+                        <span className="text-muted-foreground">
+                          {defect.externalSystem === "jira" ? defect.externalId : `#${defect.externalId}`}
+                        </span>
                       )}
                     </TableCell>
 

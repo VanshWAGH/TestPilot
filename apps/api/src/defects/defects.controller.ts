@@ -11,6 +11,7 @@ import {
   Inject,
   forwardRef,
   Optional,
+  NotFoundException,
 } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { Public } from "../auth/public.decorator";
@@ -18,11 +19,13 @@ import { DefectCreationService } from "./defect-creation.service";
 import { DefectTestLinkService } from "./defect-test-link.service";
 import { DefectVerificationResultService } from "./defect-verification-result.service";
 import { DefectAnalyticsService } from "./defect-analytics.service";
+import { JiraService } from "./jira.service";
 import { GitHubWebhookService } from "../github/github-webhook.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateDefectDto } from "./dto/create-defect.dto";
 import { LinkDefectTestDto } from "./dto/link-defect-test.dto";
 import { VerificationResultDto } from "./dto/verification-result.dto";
+import { OverrideSeverityDto } from "./dto/override-severity.dto";
 
 /**
  * Defects Controller
@@ -50,6 +53,8 @@ export class DefectsController {
     private readonly verificationResultService?: DefectVerificationResultService,
     @Optional()
     private readonly analyticsService?: DefectAnalyticsService,
+    @Optional()
+    private readonly jiraService?: JiraService,
   ) {}
 
   // ─── Task 5.3: List All Defects (Global with filters) ─────────────────────
@@ -249,5 +254,60 @@ export class DefectsController {
       return { received: false, message: "VerificationResultService not configured" };
     }
     return this.verificationResultService.handleResult(dto);
+  }
+
+  // ─── Task 5.10: Defect Severity Human Override ───────────────────────────
+
+  @Post("projects/:projectId/defects/:defectId/override-severity")
+  @HttpCode(HttpStatus.OK)
+  async overrideSeverity(
+    @Param("projectId") _projectId: string,
+    @Param("defectId") defectId: string,
+    @Body() dto: OverrideSeverityDto,
+  ): Promise<any> {
+    return this.defectCreation.overrideSeverity(defectId, dto);
+  }
+
+  @Post("defects/:defectId/override-severity")
+  @HttpCode(HttpStatus.OK)
+  async overrideGlobalSeverity(
+    @Param("defectId") defectId: string,
+    @Body() dto: OverrideSeverityDto,
+  ): Promise<any> {
+    return this.defectCreation.overrideSeverity(defectId, dto);
+  }
+
+  // ─── Task 5.9: Optional Jira Webhook Listener & Status Sync ───────────────
+
+  @Public()
+  @Post("jira/webhook")
+  @HttpCode(HttpStatus.OK)
+  async handleJiraWebhook(@Body() payload: any) {
+    if (!this.jiraService) {
+      return { received: true, message: "JiraService not enabled" };
+    }
+    return this.jiraService.handleWebhook(payload);
+  }
+
+  @Post("projects/:projectId/defects/:defectId/sync-jira")
+  @HttpCode(HttpStatus.OK)
+  async syncJiraStatus(
+    @Param("projectId") projectId: string,
+    @Param("defectId") defectId: string,
+    @Body("targetStatus") targetStatus: any,
+  ): Promise<any> {
+    const defect = await this.prisma.defect.findFirst({
+      where: { id: defectId, projectId },
+      include: { project: true },
+    });
+    if (!defect) throw new NotFoundException(`Defect "${defectId}" not found`);
+    if (!this.jiraService) {
+      return { success: false, message: "Jira integration not enabled" };
+    }
+    return this.jiraService.syncStatus(
+      defect.project,
+      defect.externalId,
+      targetStatus || defect.status,
+    );
   }
 }

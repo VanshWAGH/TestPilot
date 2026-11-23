@@ -10,6 +10,14 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ExternalLink,
   Tag,
@@ -24,8 +32,10 @@ import {
   Copy,
   Check,
   History,
+  SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
-import type { DefectItem, DefectVerificationAttemptItem } from "./types";
+import type { DefectItem, DefectVerificationAttemptItem, DefectSeverity } from "./types";
 import { toast } from "sonner";
 
 interface DefectDetailDialogProps {
@@ -44,10 +54,19 @@ export function DefectDetailDialog({
   const [verifying, setVerifying] = useState(false);
   const [copiedTag, setCopiedTag] = useState(false);
   const [history, setHistory] = useState<DefectVerificationAttemptItem[]>(defect?.verificationHistory || []);
+  const [currentSeverity, setCurrentSeverity] = useState<DefectSeverity>(defect?.severity || "medium");
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [newSeverity, setNewSeverity] = useState<DefectSeverity>(defect?.severity || "medium");
+  const [overrideReason, setOverrideReason] = useState("");
+  const [savingOverride, setSavingOverride] = useState(false);
 
   useEffect(() => {
     if (defect) {
       setHistory(defect.verificationHistory || []);
+      setCurrentSeverity(defect.severity);
+      setNewSeverity(defect.severity);
+      setOverrideReason(defect.severityOverrideReason || "");
+      setOverrideOpen(false);
       fetch(`/api/defects/defects/${defect.id}/history`)
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => {
@@ -56,6 +75,38 @@ export function DefectDetailDialog({
         .catch(() => {});
     }
   }, [defect]);
+
+  const handleSaveOverride = async () => {
+    if (!defect) return;
+    setSavingOverride(true);
+    try {
+      const res = await fetch(
+        `/api/defects/projects/${defect.projectId}/defects/${defect.id}/override-severity`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            severity: newSeverity,
+            reason: overrideReason.trim() || undefined,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `API error ${res.status}`);
+      }
+      setCurrentSeverity(newSeverity);
+      setOverrideOpen(false);
+      toast.success(
+        `Severity updated to ${newSeverity.toUpperCase()}! Synced with defect tracking issue.`,
+      );
+      onVerifyTriggered?.();
+    } catch (err: any) {
+      toast.error(`Could not override severity: ${err.message}`);
+    } finally {
+      setSavingOverride(false);
+    }
+  };
 
   if (!defect) return null;
 
@@ -114,9 +165,9 @@ export function DefectDetailDialog({
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
               variant="outline"
-              className={severityBadgeColors[defect.severity] || "border-border"}
+              className={severityBadgeColors[currentSeverity] || "border-border"}
             >
-              {defect.severity.toUpperCase()}
+              {currentSeverity.toUpperCase()}
             </Badge>
             <Badge
               variant="outline"
@@ -125,14 +176,78 @@ export function DefectDetailDialog({
               {defect.status.replace(/_/g, " ").toUpperCase()}
             </Badge>
             <span className="text-xs text-muted-foreground font-mono">
-              Issue #{defect.externalId}
+              {defect.externalSystem === "jira" ? `Jira ${defect.externalId}` : `Issue #${defect.externalId}`}
             </span>
             {defect.project?.name && (
               <span className="text-xs text-muted-foreground">
                 • {defect.project.name}
               </span>
             )}
+            {defect.severityOverrideReason && (
+              <Badge variant="outline" className="text-[10px] bg-secondary/30 text-muted-foreground">
+                Human Overridden
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setOverrideOpen((prev) => !prev)}
+              className="h-6 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground"
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+              <span>{overrideOpen ? "Cancel" : "Override Severity"}</span>
+            </Button>
           </div>
+
+          {/* Severity Human Override Form (Task 5.10) */}
+          {overrideOpen && (
+            <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 space-y-2.5 text-xs animate-in fade-in-50">
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <span>Human Severity Override (Task 5.10)</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                AI analyzed failure context and suggested initial severity. You can override it here; changes will synchronize with the external tracker.
+              </p>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <Select
+                  value={newSeverity}
+                  onValueChange={(val) => val && setNewSeverity(val as DefectSeverity)}
+                >
+                  <SelectTrigger className="w-36 h-8 text-xs bg-background">
+                    <SelectValue placeholder="Severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="Reason for override (e.g. Core payment blocked)..."
+                  className="h-8 text-xs flex-1 bg-background"
+                />
+
+                <Button
+                  size="sm"
+                  onClick={handleSaveOverride}
+                  disabled={savingOverride}
+                  className="h-8 text-xs px-3 bg-primary text-primary-foreground"
+                >
+                  {savingOverride ? (
+                    <RefreshCw className="w-3 h-3 animate-spin mr-1" />
+                  ) : (
+                    <Check className="w-3 h-3 mr-1" />
+                  )}
+                  Save
+                </Button>
+              </div>
+            </div>
+          )}
           <DialogTitle className="text-lg font-bold text-foreground leading-snug">
             {defect.title}
           </DialogTitle>
@@ -176,7 +291,7 @@ export function DefectDetailDialog({
                     size="sm"
                     className="h-8 gap-1.5 text-xs"
                   >
-                    <span>View on GitHub</span>
+                    <span>{defect.externalSystem === "jira" ? "View in Jira" : "View on GitHub"}</span>
                     <ExternalLink className="w-3 h-3" />
                   </Button>
                 </a>

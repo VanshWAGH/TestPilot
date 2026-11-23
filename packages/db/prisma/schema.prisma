@@ -69,6 +69,11 @@ model Project {
   githubOwner          String?           @map("github_owner")
   autoHealMode         String            @default("suggest") @map("auto_heal_mode") // off, suggest, auto-safe
   defectSystem     String            @default("github_issues") @map("defect_system")
+  jiraHost         String?           @map("jira_host")
+  jiraProjectKey   String?           @map("jira_project_key")
+  jiraEmail        String?           @map("jira_email")
+  jiraApiToken     String?           @map("jira_api_token")
+  jiraIssueType    String?           @default("Bug") @map("jira_issue_type")
   ciProvider       String            @default("github_actions") @map("ci_provider")
   environments     Environment[]
   crawlJobs        CrawlJob[]
@@ -358,6 +363,8 @@ model Defect {
   failureRunId         String?         @map("failure_run_id")
   verificationLabel    String?         @default("ready-for-qa") @map("verification_label")
   verificationAttempts Int             @default(0) @map("verification_attempts")
+  severityOverrideReason String?       @map("severity_override_reason")
+  severityOverriddenAt DateTime?       @map("severity_overridden_at")
   createdByPlatform    Boolean         @default(true) @map("created_by_platform")
   closedAt             DateTime?       @map("closed_at")
   createdAt            DateTime        @default(now()) @map("created_at")

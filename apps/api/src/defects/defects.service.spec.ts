@@ -221,6 +221,71 @@ describe("DefectCreationService", () => {
     expect(body).toContain("[Screenshot]");
     expect(body).toContain("ready-for-qa");
   });
+
+  it("Task 5.10: overrideSeverity updates DB, modifies GitHub issue labels, and posts comment", async () => {
+    mockPrisma.defect.findUnique = vi.fn().mockResolvedValue({
+      id: "defect-new-1",
+      externalSystem: "github_issues",
+      externalId: "42",
+      severity: "medium",
+      project: mockProject,
+    });
+    mockPrisma.defect.update = vi.fn().mockResolvedValue({
+      id: "defect-new-1",
+      severity: "critical",
+      severityOverrideReason: "Payment processing affected",
+    });
+
+    service.octokitOverride = {
+      issues: {
+        removeLabel: vi.fn().mockResolvedValue({}),
+        addLabels: vi.fn().mockResolvedValue({}),
+        createComment: vi.fn().mockResolvedValue({}),
+      },
+    } as any;
+
+    const result = await service.overrideSeverity("defect-new-1", {
+      severity: "critical",
+      reason: "Payment processing affected",
+    });
+
+    expect(result.severity).toBe("critical");
+    expect(mockPrisma.defect.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "defect-new-1" },
+        data: expect.objectContaining({
+          severity: "critical",
+          severityOverrideReason: "Payment processing affected",
+        }),
+      }),
+    );
+    expect(service.octokitOverride!.issues.addLabels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        labels: ["severity:critical"],
+      }),
+    );
+    expect(service.octokitOverride!.issues.createComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("Defect Severity Overridden"),
+      }),
+    );
+  });
+
+  it("Task 5.9: falls back to GitHub Issues if Jira is selected but not configured", async () => {
+    const projectWithNoJira = { ...mockProject, defectSystem: "jira" };
+    mockPrisma.project.findUnique = vi.fn().mockResolvedValue(projectWithNoJira);
+
+    const result = await service.createDefect({
+      projectId: PROJECT_ID,
+      testResultId: TEST_RESULT_ID,
+      testRunId: TEST_RUN_ID,
+      externalSystem: "jira",
+    });
+
+    // Successfully fell back to GitHub issues without throwing
+    expect(result.defectId).toBe("defect-new-1");
+    expect(service.octokitOverride!.issues.create).toHaveBeenCalled();
+  });
 });
 
 // ─── Task 5.2 — DefectTestLinkService Tests ───────────────────────────────────
@@ -427,9 +492,13 @@ describe("DefectsController", () => {
   let mockWebhook: any;
   let mockVerificationResult: any;
   let mockAnalytics: any;
+  let mockJira: any;
 
   beforeEach(() => {
-    mockCreation = { createDefect: vi.fn() };
+    mockCreation = {
+      createDefect: vi.fn(),
+      overrideSeverity: vi.fn().mockResolvedValue({ id: "def-1", severity: "critical" }),
+    };
     mockLink = { linkDefectToTest: vi.fn(), getLinksForDefect: vi.fn() };
     mockPrisma = {
       defect: {
@@ -446,6 +515,10 @@ describe("DefectsController", () => {
     mockAnalytics = {
       getAnalytics: vi.fn().mockResolvedValue({ totalDefects: 5, avgTimeToFixHours: 12 }),
     };
+    mockJira = {
+      handleWebhook: vi.fn().mockResolvedValue({ handled: true }),
+      syncStatus: vi.fn().mockResolvedValue({ success: true }),
+    };
 
     controller = new DefectsController(
       mockCreation,
@@ -454,6 +527,7 @@ describe("DefectsController", () => {
       mockWebhook,
       mockVerificationResult,
       mockAnalytics,
+      mockJira,
     );
   });
 
@@ -492,5 +566,23 @@ describe("DefectsController", () => {
     const analytics = await controller.getGlobalAnalytics("proj-1");
     expect(mockAnalytics.getAnalytics).toHaveBeenCalledWith("proj-1");
     expect(analytics).toEqual({ totalDefects: 5, avgTimeToFixHours: 12 });
+  });
+
+  it("Task 5.10: delegates severity override to DefectCreationService", async () => {
+    const res = await controller.overrideSeverity("proj-1", "def-1", {
+      severity: "critical",
+      reason: "Payment crash",
+    });
+    expect(mockCreation.overrideSeverity).toHaveBeenCalledWith("def-1", {
+      severity: "critical",
+      reason: "Payment crash",
+    });
+    expect(res).toEqual({ id: "def-1", severity: "critical" });
+  });
+
+  it("Task 5.9: delegates Jira webhook handling to JiraService", async () => {
+    const res = await controller.handleJiraWebhook({ webhookEvent: "jira:issue_updated" });
+    expect(mockJira.handleWebhook).toHaveBeenCalled();
+    expect(res).toEqual({ handled: true });
   });
 });

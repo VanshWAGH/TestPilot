@@ -4,6 +4,7 @@ import { DefectCreationService } from "./defect-creation.service";
 import { DefectTestLinkService } from "./defect-test-link.service";
 import { DefectVerificationResultService } from "./defect-verification-result.service";
 import { DefectAnalyticsService } from "./defect-analytics.service";
+import { JiraService } from "./jira.service";
 import { LlmModule } from "../llm/llm.module";
 import { AuthModule } from "../auth/auth.module";
 import { GitHubModule } from "../github/github.module";
@@ -16,12 +17,14 @@ import { GitHubModule } from "../github/github.module";
     DefectTestLinkService,
     DefectVerificationResultService,
     DefectAnalyticsService,
+    JiraService,
   ],
   exports: [
     DefectCreationService,
     DefectTestLinkService,
     DefectVerificationResultService,
     DefectAnalyticsService,
+    JiraService,
   ],
 })
 export class DefectsModule {}

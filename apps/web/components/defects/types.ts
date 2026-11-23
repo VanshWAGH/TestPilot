@@ -56,6 +56,8 @@ export interface DefectItem {
   verificationAttempts: number;
   createdByPlatform: boolean;
   closedAt?: string | null;
+  severityOverrideReason?: string | null;
+  severityOverriddenAt?: string | null;
   createdAt: string;
   testLinks?: DefectTestLinkItem[];
   verificationHistory?: DefectVerificationAttemptItem[];

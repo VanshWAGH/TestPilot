@@ -1,6 +1,7 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, BadRequestException, Optional } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { LlmService } from "../llm/llm.service";
+import { JiraService } from "./jira.service";
 import { Octokit } from "@octokit/rest";
 import type {
   DefectCreateInput,
@@ -9,6 +10,7 @@ import type {
   CreatedDefect,
   DefectSeverity,
 } from "./defects.types";
+import { OverrideSeverityDto } from "./dto/override-severity.dto";
 
 /**
  * Task 5.1 — Defect Creation Service
@@ -29,6 +31,8 @@ export class DefectCreationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly llm: LlmService,
+    @Optional()
+    public readonly jiraService?: JiraService,
   ) {}
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -98,7 +102,7 @@ export class DefectCreationService {
     // 4. LLM severity suggestion
     const severitySuggestion = await this.suggestSeverityWithLlm(evidence);
 
-    // 5. File the GitHub Issue
+    // 5. File the GitHub Issue or Jira Ticket
     const externalSystem = (input.externalSystem ||
       project.defectSystem ||
       "github_issues") as "github_issues" | "jira";
@@ -107,14 +111,25 @@ export class DefectCreationService {
     let externalUrl: string;
     let title: string;
 
-    if (externalSystem === "github_issues") {
-      const result = await this.fileGitHubIssue(project, evidence, severitySuggestion);
-      externalId = String(result.number);
-      externalUrl = result.htmlUrl;
-      title = result.title;
+    if (externalSystem === "jira" && this.jiraService?.isConfigured(project)) {
+      try {
+        const jiraResult = await this.jiraService.createIssue(project, evidence, severitySuggestion);
+        externalId = jiraResult.key;
+        externalUrl = jiraResult.url;
+        title = jiraResult.title;
+      } catch (err: any) {
+        this.logger.warn(`Jira issue creation failed: ${err.message}. Falling back to GitHub Issues.`);
+        const result = await this.fileGitHubIssue(project, evidence, severitySuggestion);
+        externalId = String(result.number);
+        externalUrl = result.htmlUrl;
+        title = result.title;
+      }
     } else {
-      // Jira placeholder — extend in future phases
-      this.logger.warn(`Jira filing not yet implemented. Falling back to GitHub Issues.`);
+      if (externalSystem === "jira") {
+        this.logger.warn(
+          `Jira requested but not configured on project "${project.name}". Falling back to GitHub Issues.`,
+        );
+      }
       const result = await this.fileGitHubIssue(project, evidence, severitySuggestion);
       externalId = String(result.number);
       externalUrl = result.htmlUrl;
@@ -382,5 +397,95 @@ Suggest severity (critical/high/medium/low):`;
       process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
     if (token) return new Octokit({ auth: token });
     return new Octokit({ auth: installationId ? `token_${installationId}` : "dummy_token" });
+  }
+
+  // ─── Task 5.10: Defect Severity Human Override ─────────────────────────────
+
+  /**
+   * Allows human QA reviewer to override the defect severity suggested by the LLM.
+   * Updates DB record, synchronizes GitHub issue label and comment, and updates Jira if linked.
+   */
+  async overrideSeverity(
+    defectId: string,
+    dto: OverrideSeverityDto,
+    reviewer = "QA Reviewer",
+  ): Promise<any> {
+    const defect = await this.prisma.defect.findUnique({
+      where: { id: defectId },
+      include: { project: true },
+    });
+
+    if (!defect) {
+      throw new NotFoundException(`Defect "${defectId}" not found`);
+    }
+
+    const oldSeverity = defect.severity;
+    const newSeverity = dto.severity;
+
+    // 1. Update DB
+    const updated = await this.prisma.defect.update({
+      where: { id: defectId },
+      data: {
+        severity: newSeverity,
+        severityOverrideReason: dto.reason || "Manual QA override",
+        severityOverriddenAt: new Date(),
+      },
+    });
+
+    this.logger.log(
+      `Defect ${defectId} severity overridden from ${oldSeverity} to ${newSeverity} by ${reviewer}`,
+    );
+
+    const project = defect.project as any;
+    const reasonText = dto.reason ? `\n> **Reason:** ${dto.reason}` : "";
+    const commentBody = `ℹ️ **Defect Severity Overridden:** Changed from \`${oldSeverity.toUpperCase()}\` to \`${newSeverity.toUpperCase()}\` by ${reviewer}.${reasonText}`;
+
+    // 2. Sync to GitHub if GitHub issue
+    if (defect.externalSystem === "github_issues" && defect.externalId) {
+      try {
+        const octokit = this.octokitOverride ?? this.getOctokitClient(project.githubInstallationId);
+        const defectRepo = project.githubDefectRepo || project.githubTestRepo;
+        if (defectRepo) {
+          const [owner, repo] = defectRepo.split("/");
+          const issueNumber = Number(defect.externalId);
+
+          try {
+            await octokit.issues.removeLabel({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              name: `severity:${oldSeverity}`,
+            });
+          } catch {
+            // Label might not exist, proceed
+          }
+
+          await octokit.issues.addLabels({
+            owner,
+            repo,
+            issue_number: issueNumber,
+            labels: [`severity:${newSeverity}`],
+          });
+
+          await octokit.issues.createComment({
+            owner,
+            repo,
+            issue_number: issueNumber,
+            body: commentBody,
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not sync severity override to GitHub: ${err.message}`);
+      }
+    } else if (defect.externalSystem === "jira" && this.jiraService?.isConfigured(project)) {
+      // 3. Sync to Jira if Jira issue
+      try {
+        await this.jiraService.addComment(project, defect.externalId, commentBody);
+      } catch (err: any) {
+        this.logger.warn(`Could not sync severity override to Jira: ${err.message}`);
+      }
+    }
+
+    return updated;
   }
 }
