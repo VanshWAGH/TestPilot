@@ -367,7 +367,7 @@ testpilot/
 | 5.10 | **Defect severity suggestion** | LLM analyzes failure context (affected page, user journey, error type) to suggest severity: critical/high/medium/low. Human can override. | ✅ **Completed** (Implemented in `DefectCreationService.suggestSeverityWithLlm` and `overrideSeverity`: LLM evaluates failure context [affected page route, user journey steps, assertion errors, console logs] to suggest initial severity with confidence & reasoning; QA reviewer can override severity via `POST /api/v1/projects/:projectId/defects/:defectId/override-severity`; synchronizes updated severity label and comment to GitHub issue or Jira ticket; interactive override UI provided in `DefectDetailDialog`) |
 
 #### Definition of Done
-- [ ] Simulate a real product bug on SauceDemo (e.g., cart count wrong)
+- [x] Simulate a real product bug on SauceDemo (e.g., cart count wrong)
 - [x] Platform creates a GitHub Issue with full evidence
 - [x] Test file gets `@DEFECT-<id>` tag
 - [x] Developer adds `ready-for-qa` label (triggers webhook & verification)
