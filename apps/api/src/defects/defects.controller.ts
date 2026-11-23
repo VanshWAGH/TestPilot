@@ -17,6 +17,7 @@ import { Public } from "../auth/public.decorator";
 import { DefectCreationService } from "./defect-creation.service";
 import { DefectTestLinkService } from "./defect-test-link.service";
 import { DefectVerificationResultService } from "./defect-verification-result.service";
+import { DefectAnalyticsService } from "./defect-analytics.service";
 import { GitHubWebhookService } from "../github/github-webhook.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateDefectDto } from "./dto/create-defect.dto";
@@ -47,6 +48,8 @@ export class DefectsController {
     private readonly webhookService?: GitHubWebhookService,
     @Optional()
     private readonly verificationResultService?: DefectVerificationResultService,
+    @Optional()
+    private readonly analyticsService?: DefectAnalyticsService,
   ) {}
 
   // ─── Task 5.3: List All Defects (Global with filters) ─────────────────────
@@ -57,7 +60,7 @@ export class DefectsController {
     @Query("status") status?: string,
     @Query("severity") severity?: string,
     @Query("search") search?: string,
-  ) {
+  ): Promise<any> {
     const where: any = {};
     if (projectId) where.projectId = projectId;
     if (status) where.status = status;
@@ -86,8 +89,29 @@ export class DefectsController {
         testLinks: {
           orderBy: { createdAt: "asc" },
         },
+        verificationHistory: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
+  }
+
+  // ─── Task 5.8: Defect Dashboard Analytics ────────────────────────────────
+
+  @Get("defects/analytics")
+  async getGlobalAnalytics(@Query("projectId") projectId?: string) {
+    if (!this.analyticsService) {
+      return { totalDefects: 0, bySeverity: {}, byStatus: {}, avgTimeToFixHours: 0, verificationMetrics: {} };
+    }
+    return this.analyticsService.getAnalytics(projectId);
+  }
+
+  @Get("projects/:projectId/defects/analytics")
+  async getProjectAnalytics(@Param("projectId") projectId: string) {
+    if (!this.analyticsService) {
+      return { totalDefects: 0, bySeverity: {}, byStatus: {}, avgTimeToFixHours: 0, verificationMetrics: {} };
+    }
+    return this.analyticsService.getAnalytics(projectId);
   }
 
   // ─── Task 5.1: Create Defect ─────────────────────────────────────────────
@@ -151,13 +175,14 @@ export class DefectsController {
   // ─── List Defects for Project ─────────────────────────────────────────────
 
   @Get("projects/:projectId/defects")
-  async listDefects(@Param("projectId") projectId: string) {
+  async listDefects(@Param("projectId") projectId: string): Promise<any> {
     return this.prisma.defect.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
       include: {
         testLinks: { orderBy: { createdAt: "asc" } },
-        _count: { select: { testLinks: true } },
+        verificationHistory: { orderBy: { createdAt: "desc" } },
+        _count: { select: { testLinks: true, verificationHistory: true } },
       },
     });
   }
@@ -168,7 +193,7 @@ export class DefectsController {
   async getDefect(
     @Param("projectId") projectId: string,
     @Param("defectId") defectId: string,
-  ) {
+  ): Promise<any> {
     return this.prisma.defect.findFirst({
       where: { id: defectId, projectId },
       include: {
@@ -182,6 +207,7 @@ export class DefectsController {
           },
         },
         testLinks: { orderBy: { createdAt: "asc" } },
+        verificationHistory: { orderBy: { createdAt: "desc" } },
       },
     });
   }
@@ -194,6 +220,23 @@ export class DefectsController {
     @Param("defectId") defectId: string,
   ) {
     return this.defectTestLink.getLinksForDefect(defectId);
+  }
+
+  // ─── Task 5.7: Get Verification History for Defect ─────────────────────────
+
+  @Get("defects/:defectId/history")
+  async getDefectHistory(@Param("defectId") defectId: string): Promise<any> {
+    if (!this.verificationResultService) return [];
+    return this.verificationResultService.getVerificationHistory(defectId);
+  }
+
+  @Get("projects/:projectId/defects/:defectId/history")
+  async getProjectDefectHistory(
+    @Param("projectId") _projectId: string,
+    @Param("defectId") defectId: string,
+  ): Promise<any> {
+    if (!this.verificationResultService) return [];
+    return this.verificationResultService.getVerificationHistory(defectId);
   }
 
   // ─── Task 5.6: Ingest Defect Verification Results ─────────────────────────

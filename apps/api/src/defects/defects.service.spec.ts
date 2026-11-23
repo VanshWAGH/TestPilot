@@ -426,6 +426,7 @@ describe("DefectsController", () => {
   let mockPrisma: any;
   let mockWebhook: any;
   let mockVerificationResult: any;
+  let mockAnalytics: any;
 
   beforeEach(() => {
     mockCreation = { createDefect: vi.fn() };
@@ -438,7 +439,13 @@ describe("DefectsController", () => {
       },
     };
     mockWebhook = { triggerVerificationForDefect: vi.fn().mockResolvedValue({ testRunId: "run-1" }) };
-    mockVerificationResult = { handleResult: vi.fn().mockResolvedValue({ passed: true, issueAction: "closed" }) };
+    mockVerificationResult = {
+      handleResult: vi.fn().mockResolvedValue({ passed: true, issueAction: "closed" }),
+      getVerificationHistory: vi.fn().mockResolvedValue([{ id: "att-1", attemptNumber: 1, passed: true }]),
+    };
+    mockAnalytics = {
+      getAnalytics: vi.fn().mockResolvedValue({ totalDefects: 5, avgTimeToFixHours: 12 }),
+    };
 
     controller = new DefectsController(
       mockCreation,
@@ -446,6 +453,7 @@ describe("DefectsController", () => {
       mockPrisma,
       mockWebhook,
       mockVerificationResult,
+      mockAnalytics,
     );
   });
 
@@ -472,5 +480,17 @@ describe("DefectsController", () => {
     const res = await controller.handleVerificationResult(dto);
     expect(mockVerificationResult.handleResult).toHaveBeenCalledWith(dto);
     expect(res).toEqual({ passed: true, issueAction: "closed" });
+  });
+
+  it("Task 5.7: delegates verification history lookup to DefectVerificationResultService", async () => {
+    const history = await controller.getDefectHistory("def-1");
+    expect(mockVerificationResult.getVerificationHistory).toHaveBeenCalledWith("def-1");
+    expect(history).toEqual([{ id: "att-1", attemptNumber: 1, passed: true }]);
+  });
+
+  it("Task 5.8: retrieves defect analytics via DefectAnalyticsService", async () => {
+    const analytics = await controller.getGlobalAnalytics("proj-1");
+    expect(mockAnalytics.getAnalytics).toHaveBeenCalledWith("proj-1");
+    expect(analytics).toEqual({ totalDefects: 5, avgTimeToFixHours: 12 });
   });
 });

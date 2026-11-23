@@ -20,6 +20,20 @@ export interface DefectTestLinkItem {
   createdAt: string;
 }
 
+export interface DefectVerificationAttemptItem {
+  id: string;
+  defectId: string;
+  attemptNumber: number;
+  passed: boolean;
+  workflowRunId?: string | null;
+  reportUrl?: string | null;
+  evidenceUrls?: any;
+  commentUrl?: string | null;
+  triggeredAt?: string;
+  completedAt?: string | null;
+  createdAt: string;
+}
+
 export interface DefectItem {
   id: string;
   projectId: string;
@@ -44,6 +58,7 @@ export interface DefectItem {
   closedAt?: string | null;
   createdAt: string;
   testLinks?: DefectTestLinkItem[];
+  verificationHistory?: DefectVerificationAttemptItem[];
 }
 
 export interface ProjectOption {
@@ -52,4 +67,40 @@ export interface ProjectOption {
   baseUrl: string;
   githubDefectRepo?: string | null;
   githubTestRepo?: string | null;
+}
+
+export interface DefectAnalyticsData {
+  totalDefects: number;
+  bySeverity: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  byStatus: {
+    open: number;
+    in_progress: number;
+    ready_for_qa: number;
+    qa_passed: number;
+    qa_failed: number;
+    closed: number;
+  };
+  avgTimeToFixHours: number;
+  avgTimeToFixDays: number;
+  verificationMetrics: {
+    totalAttempts: number;
+    passedAttempts: number;
+    failedAttempts: number;
+    passRate: number;
+  };
+  severityDistribution: Array<{
+    severity: string;
+    count: number;
+    percentage: number;
+  }>;
+  statusDistribution: Array<{
+    status: string;
+    count: number;
+    percentage: number;
+  }>;
 }

@@ -61,6 +61,13 @@ export class DefectVerificationResultService {
         `Defect ${dto.defectId} has no GitHub issue linked (repo="${defectRepo}", issueNumber=${issueNumber}). Updating DB only.`,
       );
       await this.updateDefectStatus(dto.defectId, dto.passed);
+      await this.recordAttempt(
+        dto.defectId,
+        defect.verificationAttempts || 1,
+        dto.passed,
+        dto.workflowRunId,
+        dto.reportUrl,
+      );
       return {
         defectId: dto.defectId,
         passed: dto.passed,
@@ -156,6 +163,14 @@ export class DefectVerificationResultService {
 
     // 4. Update DB
     await this.updateDefectStatus(defect.id, true);
+    await this.recordAttempt(
+      defect.id,
+      defect.verificationAttempts || 1,
+      true,
+      dto.workflowRunId,
+      dto.reportUrl,
+      commentUrl,
+    );
 
     return {
       defectId: defect.id,
@@ -244,6 +259,14 @@ export class DefectVerificationResultService {
 
     // 4. Update DB
     await this.updateDefectStatus(defect.id, false);
+    await this.recordAttempt(
+      defect.id,
+      defect.verificationAttempts || 1,
+      false,
+      dto.workflowRunId,
+      dto.reportUrl,
+      commentUrl,
+    );
 
     return {
       defectId: defect.id,
@@ -266,6 +289,43 @@ export class DefectVerificationResultService {
       },
     });
     this.logger.log(`Defect ${defectId} status updated to "${passed ? "qa_passed" : "qa_failed"}"`);
+  }
+
+  // ─── Task 5.7: Verification History ───────────────────────────────────────
+
+  async getVerificationHistory(defectId: string): Promise<any[]> {
+    return this.prisma.defectVerificationAttempt.findMany({
+      where: { defectId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  private async recordAttempt(
+    defectId: string,
+    attemptNumber: number,
+    passed: boolean,
+    workflowRunId?: string,
+    reportUrl?: string,
+    commentUrl?: string,
+  ): Promise<void> {
+    try {
+      if ((this.prisma as any).defectVerificationAttempt) {
+        await this.prisma.defectVerificationAttempt.create({
+          data: {
+            defectId,
+            attemptNumber,
+            passed,
+            workflowRunId,
+            reportUrl,
+            commentUrl,
+            completedAt: new Date(),
+          },
+        });
+        this.logger.log(`Recorded verification attempt #${attemptNumber} for defect ${defectId}`);
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not record verification attempt: ${err.message}`);
+    }
   }
 
   /**

@@ -53,6 +53,12 @@ describe("DefectVerificationResultService", () => {
         findUnique: vi.fn().mockResolvedValue(mockDefect),
         update: vi.fn().mockResolvedValue({ ...mockDefect, status: "qa_passed" }),
       },
+      defectVerificationAttempt: {
+        create: vi.fn().mockResolvedValue({ id: "att-1" }),
+        findMany: vi.fn().mockResolvedValue([
+          { id: "att-1", defectId: DEFECT_ID, attemptNumber: 1, passed: true },
+        ]),
+      },
     };
 
     mockOctokit = {
@@ -126,6 +132,17 @@ describe("DefectVerificationResultService", () => {
     // DB update includes closedAt
     const updateCall = mockPrisma.defect.update.mock.calls[0][0];
     expect(updateCall.data.closedAt).toBeInstanceOf(Date);
+
+    // Task 5.7: verification attempt history is recorded
+    expect(mockPrisma.defectVerificationAttempt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          defectId: DEFECT_ID,
+          passed: true,
+          workflowRunId: "run-99999",
+        }),
+      }),
+    );
   });
 
   // ─── Task 5.6: Failed ────────────────────────────────────────────────────
@@ -261,5 +278,19 @@ describe("DefectVerificationResultService", () => {
 
     // addLabels was still called
     expect(mockOctokit.issues.addLabels).toHaveBeenCalled();
+  });
+
+  // ─── Task 5.7: Retrieve Verification History ──────────────────────────────
+
+  it("Task 5.7: retrieves all verification attempts for a defect", async () => {
+    const history = await service.getVerificationHistory(DEFECT_ID);
+    expect(history).toHaveLength(1);
+    expect(history[0].defectId).toBe(DEFECT_ID);
+    expect(mockPrisma.defectVerificationAttempt.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { defectId: DEFECT_ID },
+        orderBy: { createdAt: "desc" },
+      }),
+    );
   });
 });

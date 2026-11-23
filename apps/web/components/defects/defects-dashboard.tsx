@@ -35,7 +35,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DefectDetailDialog } from "./defect-detail-dialog";
-import type { DefectItem, ProjectOption } from "./types";
+import { DefectAnalyticsCharts } from "./defect-analytics-charts";
+import type { DefectItem, DefectAnalyticsData, ProjectOption } from "./types";
 import { toast } from "sonner";
 
 interface DefectsDashboardProps {
@@ -47,6 +48,8 @@ export function DefectsDashboard({ initialProjects = [] }: DefectsDashboardProps
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [defects, setDefects] = useState<DefectItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<DefectAnalyticsData | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -75,9 +78,31 @@ export function DefectsDashboard({ initialProjects = [] }: DefectsDashboardProps
     }
   }, [selectedProjectId]);
 
+  // Fetch defect analytics from API proxy
+  const fetchAnalytics = useCallback(async () => {
+    setLoadingAnalytics(true);
+    try {
+      const url =
+        selectedProjectId === "all"
+          ? "/api/defects/defects/analytics"
+          : `/api/defects/projects/${selectedProjectId}/defects/analytics`;
+
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalytics(data);
+      }
+    } catch {
+      // Analytics query optional fallback
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  }, [selectedProjectId]);
+
   useEffect(() => {
     fetchDefects();
-  }, [fetchDefects]);
+    fetchAnalytics();
+  }, [fetchDefects, fetchAnalytics]);
 
   // Filtered defects
   const filteredDefects = useMemo(() => {
@@ -197,7 +222,10 @@ export function DefectsDashboard({ initialProjects = [] }: DefectsDashboardProps
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchDefects}
+            onClick={() => {
+              fetchDefects();
+              fetchAnalytics();
+            }}
             disabled={loading}
             className="h-9 gap-1.5 text-xs"
           >
@@ -207,46 +235,56 @@ export function DefectsDashboard({ initialProjects = [] }: DefectsDashboardProps
         </div>
       </div>
 
-      {/* Metrics Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Total Defects</span>
-            <Bug className="w-4 h-4 text-muted-foreground" />
+      {/* Task 5.8: Defect Dashboard & Lifecycle Analytics Charts */}
+      {analytics ? (
+        <DefectAnalyticsCharts
+          analytics={analytics}
+          loading={loadingAnalytics}
+          onSelectSeverity={(sev) => setSeverityFilter(sev === severityFilter ? "all" : sev)}
+          onSelectStatus={(st) => setStatusFilter(st === statusFilter ? "all" : st)}
+        />
+      ) : (
+        /* Fallback Metrics Summary Cards */
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Total Defects</span>
+              <Bug className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="text-2xl font-bold text-foreground">{metrics.total}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {metrics.critical} critical severity
+            </div>
           </div>
-          <div className="text-2xl font-bold text-foreground">{metrics.total}</div>
-          <div className="text-[11px] text-muted-foreground">
-            {metrics.critical} critical severity
-          </div>
-        </div>
 
-        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Open & In Progress</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+          <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Open & In Progress</span>
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+            </div>
+            <div className="text-2xl font-bold text-amber-400">{metrics.open}</div>
+            <div className="text-[11px] text-muted-foreground">Awaiting developer fix</div>
           </div>
-          <div className="text-2xl font-bold text-amber-400">{metrics.open}</div>
-          <div className="text-[11px] text-muted-foreground">Awaiting developer fix</div>
-        </div>
 
-        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Ready for QA</span>
-            <Clock className="w-4 h-4 text-purple-400" />
+          <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Ready for QA</span>
+              <Clock className="w-4 h-4 text-purple-400" />
+            </div>
+            <div className="text-2xl font-bold text-purple-400">{metrics.readyForQa}</div>
+            <div className="text-[11px] text-muted-foreground">Pending verification run</div>
           </div>
-          <div className="text-2xl font-bold text-purple-400">{metrics.readyForQa}</div>
-          <div className="text-[11px] text-muted-foreground">Pending verification run</div>
-        </div>
 
-        <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>QA Verified / Closed</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="p-4 rounded-xl border border-border bg-card/60 backdrop-blur-sm space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>QA Verified / Closed</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div className="text-2xl font-bold text-emerald-400">{metrics.verified}</div>
+            <div className="text-[11px] text-muted-foreground">Pass confirmed by CI</div>
           </div>
-          <div className="text-2xl font-bold text-emerald-400">{metrics.verified}</div>
-          <div className="text-[11px] text-muted-foreground">Pass confirmed by CI</div>
         </div>
-      </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col md:flex-row items-center gap-3 p-3.5 rounded-xl border border-border bg-card/60">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,12 +18,14 @@ import {
   PlayCircle,
   AlertTriangle,
   CheckCircle2,
+  XCircle,
   Clock,
   RefreshCw,
   Copy,
   Check,
+  History,
 } from "lucide-react";
-import type { DefectItem } from "./types";
+import type { DefectItem, DefectVerificationAttemptItem } from "./types";
 import { toast } from "sonner";
 
 interface DefectDetailDialogProps {
@@ -41,6 +43,19 @@ export function DefectDetailDialog({
 }: DefectDetailDialogProps) {
   const [verifying, setVerifying] = useState(false);
   const [copiedTag, setCopiedTag] = useState(false);
+  const [history, setHistory] = useState<DefectVerificationAttemptItem[]>(defect?.verificationHistory || []);
+
+  useEffect(() => {
+    if (defect) {
+      setHistory(defect.verificationHistory || []);
+      fetch(`/api/defects/defects/${defect.id}/history`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) setHistory(data);
+        })
+        .catch(() => {});
+    }
+  }, [defect]);
 
   if (!defect) return null;
 
@@ -229,6 +244,100 @@ export function DefectDetailDialog({
             <div className="rounded-lg border border-border bg-slate-950 p-4 font-mono text-xs text-slate-300 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed">
               {defect.description}
             </div>
+          </div>
+
+          {/* Verification History (Task 5.7) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                <History className="w-4 h-4 text-primary" />
+                <span>Verification Attempt History (Task 5.7)</span>
+              </div>
+              <Badge variant="outline" className="text-[11px] font-mono">
+                {history.length} {history.length === 1 ? "attempt" : "attempts"}
+              </Badge>
+            </div>
+
+            {history.length > 0 ? (
+              <div className="space-y-2">
+                {history.map((att) => (
+                  <div
+                    key={att.id}
+                    className="p-3 rounded-lg border border-border bg-card/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {att.passed ? (
+                        <div className="h-6 w-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </div>
+                      ) : (
+                        <div className="h-6 w-6 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                          <XCircle className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">
+                            Attempt #{att.attemptNumber}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={
+                              att.passed
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]"
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/20 text-[10px]"
+                            }
+                          >
+                            {att.passed ? "PASSED" : "FAILED"}
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            {new Date(att.completedAt || att.createdAt).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      {att.reportUrl && (
+                        <a
+                          href={att.reportUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2 py-1 rounded"
+                        >
+                          <span>Evidence Run</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                      {att.commentUrl && (
+                        <a
+                          href={att.commentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 bg-secondary/30 px-2 py-1 rounded"
+                        >
+                          <span>Comment</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground text-center space-y-1">
+                <p>No verification attempts recorded yet.</p>
+                <p className="text-[11px] text-muted-foreground/80">
+                  Runs will appear here after GitHub Actions verification executes or when you click &quot;Run Verification QA&quot;.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Verification Lifecycle Info */}

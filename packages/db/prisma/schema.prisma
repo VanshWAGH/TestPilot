@@ -362,6 +362,7 @@ model Defect {
   closedAt             DateTime?       @map("closed_at")
   createdAt            DateTime        @default(now()) @map("created_at")
   testLinks            DefectTestLink[]
+  verificationHistory  DefectVerificationAttempt[]
 
   @@index([projectId])
   @@index([projectId, status])
@@ -388,6 +389,26 @@ model DefectTestLink {
   @@index([projectId])
   @@index([testResultId])
   @@map("defect_test_links")
+}
+
+// ─── Task 5.7: Defect Verification History ──────────────────────────────────
+
+model DefectVerificationAttempt {
+  id            String    @id @default(uuid())
+  defectId      String    @map("defect_id")
+  defect        Defect    @relation(fields: [defectId], references: [id], onDelete: Cascade)
+  attemptNumber Int       @map("attempt_number")
+  passed        Boolean
+  workflowRunId String?   @map("workflow_run_id")
+  reportUrl     String?   @map("report_url")
+  evidenceUrls  Json?     @map("evidence_urls")
+  commentUrl    String?   @map("comment_url")
+  triggeredAt   DateTime  @default(now()) @map("triggered_at")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([defectId])
+  @@map("defect_verification_attempts")
 }
 
 model GitHubInstallation {
