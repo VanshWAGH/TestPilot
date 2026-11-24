@@ -17,6 +17,7 @@ import { HealingModule } from "./healing/healing.module";
 import { DefectsModule } from "./defects/defects.module";
 import { SchedulingModule } from "./scheduling/scheduling.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { AuditModule } from "./audit/audit.module";
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
     DefectsModule,
     SchedulingModule,
     NotificationsModule,
+    AuditModule,
   ],
 })
 export class AppModule {}

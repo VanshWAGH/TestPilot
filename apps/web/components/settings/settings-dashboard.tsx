@@ -9,6 +9,8 @@ import {
   Bell,
   Cpu,
   Users,
+  ShieldCheck,
+  FileText,
   Sparkles,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -17,6 +19,8 @@ import { NotificationSettingsCard } from "./notification-settings-card";
 import { LlmSettingsCard } from "./llm-settings-card";
 import { EnvironmentsSettingsCard } from "./environments-settings-card";
 import { TeamSettingsCard } from "./team-settings-card";
+import { SecurityChecklistCard } from "../security/security-checklist-card";
+import { AuditLogViewer } from "../audit/audit-log-viewer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -119,6 +123,22 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
           </TabsTrigger>
 
           <TabsTrigger
+            value="security"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            Security &amp; Hardening
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="audit"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Audit Trail
+          </TabsTrigger>
+
+          <TabsTrigger
             value="preferences"
             className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
           >
@@ -152,7 +172,17 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
           <TeamSettingsCard projectId={selectedProjectId} />
         </TabsContent>
 
-        {/* ─── Tab 6: Automation Preferences ─────────────────────────────────── */}
+        {/* ─── Tab 6: Security Hardening (Task 6.5) ───────────────────────────── */}
+        <TabsContent value="security" className="space-y-6">
+          <SecurityChecklistCard projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 7: Audit Trail (Task 6.6) ──────────────────────────────────── */}
+        <TabsContent value="audit" className="space-y-6">
+          <AuditLogViewer projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 8: Automation Preferences ─────────────────────────────────── */}
         <TabsContent value="preferences" className="space-y-6">
           <Card className="bg-card/60 backdrop-blur-md border-border">
             <CardHeader>
