@@ -8,6 +8,7 @@ import {
   PlayCircle, 
   Sparkles, 
   Bug, 
+  CalendarClock,
   Settings, 
   Activity,
   Layers
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Test Runs", href: "/runs", icon: PlayCircle },
   { name: "Self-Healing", href: "/healing", icon: Sparkles },
   { name: "Defects", href: "/defects", icon: Bug },
+  { name: "Schedules", href: "/schedules", icon: CalendarClock },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

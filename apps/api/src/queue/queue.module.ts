@@ -21,6 +21,7 @@ import { QUEUES } from "./queue.constants";
       { name: QUEUES.RUN },
       { name: QUEUES.HEAL },
       { name: QUEUES.VERIFY },
+      { name: QUEUES.SCHEDULE },
     ),
     BullBoardModule.forRoot({
       route: "/admin/queues",
@@ -32,6 +33,7 @@ import { QUEUES } from "./queue.constants";
       { name: QUEUES.RUN, adapter: BullMQAdapter },
       { name: QUEUES.HEAL, adapter: BullMQAdapter },
       { name: QUEUES.VERIFY, adapter: BullMQAdapter },
+      { name: QUEUES.SCHEDULE, adapter: BullMQAdapter },
     ),
   ],
   exports: [BullModule],

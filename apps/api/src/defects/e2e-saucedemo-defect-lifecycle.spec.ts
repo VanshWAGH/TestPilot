@@ -154,7 +154,7 @@ test.describe("SauceDemo Shopping Cart", () => {
     const testErrorMessage = `Error: expect(received).toHaveText(expected)\nExpected: "2"\nReceived: "${badgeText}"\n    at tests/saucedemo-cart.spec.ts:7:54`;
 
     // Failure Classifier analyzes the test failure
-    const classifier = new FailureClassifierService({} as any, {} as any);
+    const classifier = new FailureClassifierService({} as any);
     const classification = classifier.classify({
       status: "failed",
       errorMessage: testErrorMessage,
