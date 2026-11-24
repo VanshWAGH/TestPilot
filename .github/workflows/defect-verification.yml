@@ -1,0 +1,91 @@
+name: Defect Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      defect_tag:
+        description: 'Playwright grep tag, e.g. @DEFECT-42'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to run verification on'
+        required: false
+        default: 'main'
+        type: string
+      defect_id:
+        description: 'Internal TestPilot defect ID for result reporting'
+        required: false
+        type: string
+
+jobs:
+  defect-verification:
+    name: Defect Verification — ${{ inputs.defect_tag }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Install Xvfb
+        run: sudo apt-get install -y xvfb
+
+      - name: Run defect verification tests (headed via Xvfb)
+        id: run_tests
+        run: |
+          xvfb-run --auto-servernum \
+            pnpm exec playwright test \
+              --grep "${{ inputs.defect_tag }}" \
+              --headed \
+              --reporter=json \
+              --output=verification-results
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: verification-report.json
+        continue-on-error: true
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-evidence-${{ inputs.defect_tag }}
+          path: |
+            verification-results/
+            verification-report.json
+          retention-days: 30
+
+      - name: Report verification results to TestPilot
+        if: always()
+        run: |
+          PASSED="false"
+          if [ "${{ steps.run_tests.outcome }}" = "success" ]; then
+            PASSED="true"
+          fi
+          curl -X POST "${{ secrets.TESTPILOT_API_URL }}/api/v1/defects/verification-result" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TESTPILOT_API_TOKEN }}" \
+            -d "{
+              \"defectId\": \"${{ inputs.defect_id }}\",
+              \"defectTag\": \"${{ inputs.defect_tag }}\",
+              \"workflowRunId\": \"${{ github.run_id }}\",
+              \"passed\": ${PASSED},
+              \"reportUrl\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }"
+        continue-on-error: true

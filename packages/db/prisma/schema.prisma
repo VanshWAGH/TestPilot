@@ -69,6 +69,11 @@ model Project {
   githubOwner          String?           @map("github_owner")
   autoHealMode         String            @default("suggest") @map("auto_heal_mode") // off, suggest, auto-safe
   defectSystem     String            @default("github_issues") @map("defect_system")
+  jiraHost         String?           @map("jira_host")
+  jiraProjectKey   String?           @map("jira_project_key")
+  jiraEmail        String?           @map("jira_email")
+  jiraApiToken     String?           @map("jira_api_token")
+  jiraIssueType    String?           @default("Bug") @map("jira_issue_type")
   ciProvider       String            @default("github_actions") @map("ci_provider")
   environments     Environment[]
   crawlJobs        CrawlJob[]
@@ -78,6 +83,7 @@ model Project {
   healingProposals HealingProposal[]
   defects          Defect[]
   baselines        PageBaseline[]
+  schedules        Schedule[]
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
 
@@ -345,27 +351,72 @@ model HealingProposal {
 }
 
 model Defect {
-  id                   String    @id @default(uuid())
-  projectId            String    @map("project_id")
-  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  externalSystem       String    @default("github_issues") @map("external_system")
-  externalId           String    @map("external_id")
-  externalUrl          String?   @map("external_url")
+  id                   String          @id @default(uuid())
+  projectId            String          @map("project_id")
+  project              Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  externalSystem       String          @default("github_issues") @map("external_system")
+  externalId           String          @map("external_id")
+  externalUrl          String?         @map("external_url")
   title                String
   description          String
-  severity             String    @default("medium") // critical, high, medium, low
-  status               String    @default("open") // open, in_progress, ready_for_qa, qa_passed, qa_failed, closed
-  failureRunId         String?   @map("failure_run_id")
-  verificationLabel    String?   @default("ready-for-qa") @map("verification_label")
-  verificationAttempts Int       @default(0) @map("verification_attempts")
-  createdByPlatform    Boolean   @default(true) @map("created_by_platform")
-  closedAt             DateTime? @map("closed_at")
-  createdAt            DateTime  @default(now()) @map("created_at")
+  severity             String          @default("medium") // critical, high, medium, low
+  status               String          @default("open") // open, in_progress, ready_for_qa, qa_passed, qa_failed, closed
+  failureRunId         String?         @map("failure_run_id")
+  verificationLabel    String?         @default("ready-for-qa") @map("verification_label")
+  verificationAttempts Int             @default(0) @map("verification_attempts")
+  severityOverrideReason String?       @map("severity_override_reason")
+  severityOverriddenAt DateTime?       @map("severity_overridden_at")
+  createdByPlatform    Boolean         @default(true) @map("created_by_platform")
+  closedAt             DateTime?       @map("closed_at")
+  createdAt            DateTime        @default(now()) @map("created_at")
+  testLinks            DefectTestLink[]
+  verificationHistory  DefectVerificationAttempt[]
 
   @@index([projectId])
   @@index([projectId, status])
   @@index([externalSystem, externalId])
   @@map("defects")
+}
+
+// ─── Task 5.2: Defect-Test Link ─────────────────────────────────────────────
+
+model DefectTestLink {
+  id           String   @id @default(uuid())
+  defectId     String   @map("defect_id")
+  defect       Defect   @relation(fields: [defectId], references: [id], onDelete: Cascade)
+  projectId    String   @map("project_id")
+  testResultId String   @map("test_result_id")
+  testFilePath String   @map("test_file_path")
+  tagAdded     String   @map("tag_added") // e.g. @DEFECT-123
+  commitSha    String?  @map("commit_sha")
+  branch       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([defectId, testResultId])
+  @@index([defectId])
+  @@index([projectId])
+  @@index([testResultId])
+  @@map("defect_test_links")
+}
+
+// ─── Task 5.7: Defect Verification History ──────────────────────────────────
+
+model DefectVerificationAttempt {
+  id            String    @id @default(uuid())
+  defectId      String    @map("defect_id")
+  defect        Defect    @relation(fields: [defectId], references: [id], onDelete: Cascade)
+  attemptNumber Int       @map("attempt_number")
+  passed        Boolean
+  workflowRunId String?   @map("workflow_run_id")
+  reportUrl     String?   @map("report_url")
+  evidenceUrls  Json?     @map("evidence_urls")
+  commentUrl    String?   @map("comment_url")
+  triggeredAt   DateTime  @default(now()) @map("triggered_at")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([defectId])
+  @@map("defect_verification_attempts")
 }
 
 model GitHubInstallation {
@@ -448,4 +499,24 @@ model VisualDiff {
   @@index([testRunId])
   @@index([elementId])
   @@map("visual_diffs")
+}
+
+// ─── Task 6.1/6.2: Scheduled Jobs ─────────────────────────────────────────
+
+model Schedule {
+  id             String    @id @default(uuid())
+  projectId      String    @map("project_id")
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  jobType        String    @map("job_type") // nightly_regression, daily_crawl_refresh, weekly_baseline_refresh, weekly_orphan_cleanup, nightly_flakiness_analysis
+  cronExpression String    @map("cron_expression")
+  enabled        Boolean   @default(true)
+  environmentId  String?   @map("environment_id")
+  lastRunAt      DateTime? @map("last_run_at")
+  nextRunAt      DateTime? @map("next_run_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@index([enabled])
+  @@map("schedules")
 }

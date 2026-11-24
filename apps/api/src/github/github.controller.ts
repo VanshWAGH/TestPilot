@@ -5,6 +5,8 @@ import {
   Delete,
   Body,
   Param,
+  Headers,
+  Req,
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
@@ -18,6 +20,7 @@ import {
   ApiParam,
 } from "@nestjs/swagger";
 import { GitHubService } from "./github.service";
+import { GitHubWebhookService } from "./github-webhook.service";
 import { ConnectGitHubRepoDto } from "./dto/connect-repo.dto";
 import { SaveGitHubInstallationDto } from "./dto/save-installation.dto";
 import { CommitTestsDto } from "./dto/commit-tests.dto";
@@ -29,7 +32,10 @@ import { Public } from "../auth/public.decorator";
 @UseGuards(AuthGuard)
 @Controller()
 export class GitHubController {
-  constructor(private readonly githubService: GitHubService) {}
+  constructor(
+    private readonly githubService: GitHubService,
+    private readonly webhookService: GitHubWebhookService,
+  ) {}
 
   @Public()
   @Get("github/app-info")
@@ -146,5 +152,21 @@ export class GitHubController {
     @Param("projectId", ParseUUIDPipe) projectId: string,
   ) {
     return await this.githubService.getRepoStatus(projectId);
+  }
+
+  @Public()
+  @Post("github/webhook")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "GitHub Webhook Listener (Task 5.4)",
+    description:
+      "Receives GitHub App webhooks. When an issue is labeled with 'ready-for-qa', triggers automated Playwright defect verification.",
+  })
+  async handleWebhook(
+    @Headers("x-github-event") event: string,
+    @Headers("x-hub-signature-256") signature: string,
+    @Body() payload: any,
+  ) {
+    return await this.webhookService.handleWebhook(event, payload, signature);
   }
 }
