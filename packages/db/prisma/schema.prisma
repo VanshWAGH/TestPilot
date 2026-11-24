@@ -75,6 +75,10 @@ model Project {
   jiraApiToken     String?           @map("jira_api_token")
   jiraIssueType    String?           @default("Bug") @map("jira_issue_type")
   ciProvider       String            @default("github_actions") @map("ci_provider")
+  llmProvider      String?           @default("google") @map("llm_provider") // google, openai, anthropic, groq, ollama
+  llmApiKeyEncrypted String?         @map("llm_api_key_encrypted")
+  llmModel         String?           @map("llm_model")
+  notificationConfig NotificationConfig?
   environments     Environment[]
   crawlJobs        CrawlJob[]
   pages            Page[]
@@ -519,4 +523,22 @@ model Schedule {
   @@index([projectId])
   @@index([enabled])
   @@map("schedules")
+}
+
+// ─── Task 6.3: Notification Configuration ──────────────────────────────────
+
+model NotificationConfig {
+  id              String   @id @default(uuid())
+  projectId       String   @unique @map("project_id")
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slackWebhookUrl String?  @map("slack_webhook_url")
+  emailRecipients String?  @map("email_recipients") // Comma-separated list of emails
+  sendgridApiKey  String?  @map("sendgrid_api_key")
+  resendApiKey    String?  @map("resend_api_key")
+  fromEmail       String?  @default("notifications@testpilot.ai") @map("from_email")
+  eventTriggers   String?  @default("{\"run_completed\":[\"slack\"],\"run_failed\":[\"slack\",\"email\",\"github\"],\"defect_created\":[\"slack\",\"github\"],\"defect_verified\":[\"slack\",\"github\"],\"healing_pr_opened\":[\"slack\"]}") @map("event_triggers")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_configs")
 }

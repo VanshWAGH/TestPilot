@@ -16,6 +16,7 @@ import { BaselinesModule } from "./baselines/baselines.module";
 import { HealingModule } from "./healing/healing.module";
 import { DefectsModule } from "./defects/defects.module";
 import { SchedulingModule } from "./scheduling/scheduling.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { SchedulingModule } from "./scheduling/scheduling.module";
     HealingModule,
     DefectsModule,
     SchedulingModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
