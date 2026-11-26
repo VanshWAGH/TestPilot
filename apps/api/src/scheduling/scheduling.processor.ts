@@ -4,6 +4,7 @@ import { Job, Queue } from "bullmq";
 import { QUEUES } from "../queue/queue.constants";
 import { QUEUES_SCHEDULE } from "./scheduling.constants";
 import { SchedulingService } from "./scheduling.service";
+import { OrphanCleanupService } from "./orphan-cleanup.service";
 import { MetricsService } from "../telemetry/metrics.service";
 import { TelemetryService, TraceCarrier } from "../telemetry/telemetry.service";
 
@@ -24,6 +25,7 @@ export class SchedulingProcessor extends WorkerHost {
     @Optional() @InjectQueue(QUEUES.DLQ) private readonly dlqQueue?: Queue,
     @Optional() private readonly metricsService?: MetricsService,
     @Optional() private readonly telemetryService?: TelemetryService,
+    @Optional() private readonly orphanCleanupService?: OrphanCleanupService,
   ) {
     super();
   }
@@ -177,6 +179,21 @@ export class SchedulingProcessor extends WorkerHost {
     this.logger.log(
       `Weekly orphan cleanup triggered for project ${projectId}`,
     );
+
+    if (this.orphanCleanupService) {
+      const report =
+        await this.orphanCleanupService.scanProjectOrphans(projectId);
+      return {
+        status: "triggered",
+        jobType: "weekly_orphan_cleanup",
+        projectId,
+        totalTestFiles: report.totalTestFiles,
+        orphanCount: report.orphanCount,
+        orphans: report.orphans,
+        triggeredAt: new Date().toISOString(),
+      };
+    }
+
     return {
       status: "triggered",
       jobType: "weekly_orphan_cleanup",
