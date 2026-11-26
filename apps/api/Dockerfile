@@ -16,6 +16,7 @@ RUN pnpm install --frozen-lockfile
 
 # Stage 2: Build
 FROM dependencies AS builder
+COPY tsconfig.base.json ./
 COPY packages/db ./packages/db
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
