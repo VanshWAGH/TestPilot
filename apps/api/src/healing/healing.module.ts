@@ -22,7 +22,7 @@ import { GitHubModule } from "../github/github.module";
     StorageModule,
     AuthModule,
     LlmModule,
-    GitHubModule,
+    forwardRef(() => GitHubModule),
     forwardRef(() => RunsModule),
   ],
   controllers: [HealingController],
