@@ -11,9 +11,10 @@ import { SchedulingController } from "./scheduling.controller";
   imports: [
     PrismaModule,
     AuthModule,
-    BullModule.registerQueue({
-      name: QUEUES.SCHEDULE,
-    }),
+    BullModule.registerQueue(
+      { name: QUEUES.SCHEDULE },
+      { name: QUEUES.DLQ },
+    ),
   ],
   controllers: [SchedulingController],
   providers: [SchedulingService, SchedulingProcessor],

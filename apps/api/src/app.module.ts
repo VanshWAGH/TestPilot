@@ -6,6 +6,8 @@ import { HealthModule } from "./health/health.module";
 import { AuthModule } from "./auth/auth.module";
 import { StorageModule } from "./storage/storage.module";
 import { CryptoModule } from "./common/crypto/crypto.module";
+import { TelemetryModule } from "./telemetry/telemetry.module";
+import { ResilienceModule } from "./common/resilience/resilience.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { CrawlerModule } from "./crawler/crawler.module";
 import { LlmModule } from "./llm/llm.module";
@@ -47,6 +49,7 @@ import { AuditModule } from "./audit/audit.module";
 
     PrismaModule,
     CryptoModule,
+    TelemetryModule,
     QueueModule,
     HealthModule,
     AuthModule,
@@ -63,6 +66,7 @@ import { AuditModule } from "./audit/audit.module";
     SchedulingModule,
     NotificationsModule,
     AuditModule,
+    ResilienceModule,
   ],
 })
 export class AppModule {}

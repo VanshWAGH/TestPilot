@@ -11,7 +11,7 @@ import {
   Users,
   ShieldCheck,
   FileText,
-  Sparkles,
+  Activity,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GitHubSettingsCard } from "./github-settings-card";
@@ -21,6 +21,7 @@ import { EnvironmentsSettingsCard } from "./environments-settings-card";
 import { TeamSettingsCard } from "./team-settings-card";
 import { SecurityChecklistCard } from "../security/security-checklist-card";
 import { AuditLogViewer } from "../audit/audit-log-viewer";
+import { ObservabilityResilienceCard } from "./observability-resilience-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -139,6 +140,14 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
           </TabsTrigger>
 
           <TabsTrigger
+            value="observability"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <Activity className="w-3.5 h-3.5 text-sky-400" />
+            Observability &amp; Resilience
+          </TabsTrigger>
+
+          <TabsTrigger
             value="preferences"
             className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
           >
@@ -182,7 +191,12 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
           <AuditLogViewer projectId={selectedProjectId} />
         </TabsContent>
 
-        {/* ─── Tab 8: Automation Preferences ─────────────────────────────────── */}
+        {/* ─── Tab 8: Observability & Resilience (Tasks 6.7 & 6.8) ────────────── */}
+        <TabsContent value="observability" className="space-y-6">
+          <ObservabilityResilienceCard />
+        </TabsContent>
+
+        {/* ─── Tab 9: Automation Preferences ─────────────────────────────────── */}
         <TabsContent value="preferences" className="space-y-6">
           <Card className="bg-card/60 backdrop-blur-md border-border">
             <CardHeader>

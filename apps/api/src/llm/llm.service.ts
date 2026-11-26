@@ -4,11 +4,15 @@ import {
   InternalServerErrorException,
   HttpException,
   HttpStatus,
+  Optional,
 } from "@nestjs/common";
 import { CircuitBreaker, CircuitState } from "./circuit-breaker";
 import { SlidingWindowRateLimiter } from "./rate-limiter";
 import { LlmCache } from "./llm-cache";
 import { LlmDeadLetterQueue, DeadLetterEntry } from "./llm-dead-letter-queue";
+import { CircuitBreakerService } from "../common/resilience/circuit-breaker.service";
+import { MetricsService } from "../telemetry/metrics.service";
+import { TelemetryService } from "../telemetry/telemetry.service";
 
 export type LlmTaskType =
   | "scenario_generation" // Pass 1: QA analysis, flows, edge cases
@@ -115,7 +119,11 @@ export class LlmService {
   private readonly cache = new LlmCache({ ttlMs: 3600000, maxEntries: 500 });
   private readonly dlq = new LlmDeadLetterQueue();
 
-  constructor() {}
+  constructor(
+    @Optional() private readonly circuitBreakerService?: CircuitBreakerService,
+    @Optional() private readonly metricsService?: MetricsService,
+    @Optional() private readonly telemetryService?: TelemetryService,
+  ) {}
 
   /**
    * Reads configured API keys. Supports either OPENROUTER_API_KEYS or OPENROUTER_API_KEY,
@@ -332,9 +340,8 @@ export class LlmService {
           const timer = setTimeout(() => controller.abort(), callTimeout);
 
           const activeApiKey = this.getActiveApiKey();
-          let res: Response;
-          try {
-            res = await fetch(this.baseUrl, {
+          const executeFetch = async () =>
+            fetch(this.baseUrl, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -345,6 +352,21 @@ export class LlmService {
               body: JSON.stringify(body),
               signal: controller.signal,
             });
+
+          const guardedFetch = () =>
+            this.circuitBreakerService
+              ? this.circuitBreakerService.execute("llm", executeFetch)
+              : executeFetch();
+
+          let res: Response;
+          try {
+            res = this.telemetryService
+              ? await this.telemetryService.withSpan(
+                  "llm.openrouter.request",
+                  () => guardedFetch(),
+                  { "llm.model": model, "llm.task": task },
+                )
+              : await guardedFetch();
           } finally {
             clearTimeout(timer);
           }
@@ -352,6 +374,7 @@ export class LlmService {
           const latencyMs = Date.now() - startMs;
 
           if (!res.ok) {
+            this.metricsService?.recordLlmRequest("openrouter", "failure", latencyMs, task);
             const errText = await res.text().catch(() => "");
             this.logger.warn(
               `LLM call failed for model=${model} status=${res.status} body=${errText.slice(0, 200)}`,
@@ -409,8 +432,9 @@ export class LlmService {
 
           const actualModel = (json.model as string) ?? model;
 
-          // Success: reset circuit breaker
+          // Success: reset circuit breaker & record metrics
           cb.recordSuccess();
+          this.metricsService?.recordLlmRequest("openrouter", "success", latencyMs, task);
 
           this.logger.log(
             `LLM call succeeded via ${actualModel} (latency: ${latencyMs}ms, tokens: ${llmUsage.totalTokens})`,
