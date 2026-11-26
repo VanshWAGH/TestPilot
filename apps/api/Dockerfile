@@ -32,10 +32,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
+ARG INSTALL_PLAYWRIGHT=false
+
 # Runtime dependencies (openssl for Prisma, curl for healthcheck, dumb-init for process supervisor)
 RUN apt-get update -y && apt-get install -y openssl curl dumb-init && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app /app
+
+# Optionally install Playwright Chromium browser inside container (skip for lightweight 512MB free-tier deploys)
+RUN if [ "$INSTALL_PLAYWRIGHT" = "true" ]; then pnpm --filter=@testpilot/api exec playwright install chromium --with-deps; fi
 
 EXPOSE 4000
 

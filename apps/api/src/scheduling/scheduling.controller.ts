@@ -13,13 +13,17 @@ import {
 } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { SchedulingService } from "./scheduling.service";
+import { OrphanCleanupService } from "./orphan-cleanup.service";
 import { CreateScheduleDto } from "./dto/create-schedule.dto";
 import { UpdateScheduleDto } from "./dto/update-schedule.dto";
 
 @UseGuards(AuthGuard)
 @Controller()
 export class SchedulingController {
-  constructor(private readonly schedulingService: SchedulingService) {}
+  constructor(
+    private readonly schedulingService: SchedulingService,
+    private readonly orphanCleanupService?: OrphanCleanupService,
+  ) {}
 
   @Get("schedules")
   async listAllSchedules(@Query("projectId") projectId?: string): Promise<any[]> {
@@ -61,5 +65,30 @@ export class SchedulingController {
   @Delete("schedules/:id")
   async deleteSchedule(@Param("id") id: string): Promise<{ success: boolean }> {
     return this.schedulingService.deleteSchedule(id);
+  }
+
+  // ─── Task 6.11: Orphan Test Cleanup Endpoints ────────────────────────────
+
+  @Get("projects/:projectId/orphans")
+  async getProjectOrphans(@Param("projectId") projectId: string): Promise<any> {
+    if (!this.orphanCleanupService) {
+      return { projectId, totalTestFiles: 0, orphanCount: 0, orphans: [] };
+    }
+    return this.orphanCleanupService.getLatestReport(projectId);
+  }
+
+  @Post("projects/:projectId/orphans/scan")
+  @HttpCode(HttpStatus.OK)
+  async scanProjectOrphans(@Param("projectId") projectId: string): Promise<any> {
+    if (!this.orphanCleanupService) {
+      return { projectId, totalTestFiles: 0, orphanCount: 0, orphans: [] };
+    }
+    return this.orphanCleanupService.scanProjectOrphans(projectId);
+  }
+
+  @Post("orphans/:testFileId/flag")
+  @HttpCode(HttpStatus.OK)
+  async flagOrphanTest(@Param("testFileId") testFileId: string): Promise<any> {
+    return this.orphanCleanupService!.flagForRemoval(testFileId);
   }
 }

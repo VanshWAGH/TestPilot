@@ -1,0 +1,46 @@
+# Render Blueprint — Free Tier Docker Deployment for TestPilot API
+# Pair with Vercel (free) for @testpilot/web, Supabase (free) for PostgreSQL/Storage,
+# and Upstash (free) for Redis. Render provides automatic HTTPS/SSL & custom domains.
+services:
+  - type: web
+    name: testpilot-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: testpilot-artifacts
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        generateValue: true
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: OTEL_ENABLED
+        value: "false"

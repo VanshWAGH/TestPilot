@@ -3,16 +3,17 @@ import { BullModule } from "@nestjs/bullmq";
 import { BullBoardModule } from "@bull-board/nestjs";
 import { ExpressAdapter } from "@bull-board/express";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
-import { QUEUES, DEFAULT_RETRY_JOB_OPTIONS } from "./queue.constants";
+import {
+  QUEUES,
+  DEFAULT_RETRY_JOB_OPTIONS,
+  getRedisConnectionOptions,
+} from "./queue.constants";
 
 @Module({
   imports: [
     BullModule.forRootAsync({
       useFactory: () => ({
-        connection: {
-          host: process.env.REDIS_HOST || "localhost",
-          port: parseInt(process.env.REDIS_PORT || "6379", 10),
-        },
+        connection: getRedisConnectionOptions(),
         defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS,
       }),
     }),

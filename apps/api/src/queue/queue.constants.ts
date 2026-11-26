@@ -19,3 +19,39 @@ export const DEFAULT_RETRY_JOB_OPTIONS = {
   removeOnComplete: 100,
   removeOnFail: false, // Keep failed jobs for DLQ inspection
 };
+
+/**
+ * Resolves ioredis/BullMQ connection options from REDIS_URL (e.g. Upstash rediss://)
+ * or discrete REDIS_HOST / REDIS_PORT / REDIS_PASSWORD / REDIS_TLS env vars.
+ */
+export function getRedisConnectionOptions(): {
+  host: string;
+  port: number;
+  password?: string;
+  username?: string;
+  tls?: Record<string, unknown>;
+} {
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    try {
+      const parsed = new URL(redisUrl);
+      const isTls = parsed.protocol === "rediss:";
+      return {
+        host: parsed.hostname || "localhost",
+        port: parseInt(parsed.port || "6379", 10),
+        ...(parsed.password ? { password: decodeURIComponent(parsed.password) } : {}),
+        ...(parsed.username ? { username: decodeURIComponent(parsed.username) } : {}),
+        ...(isTls ? { tls: {} } : {}),
+      };
+    } catch {
+      // Fallback to host/port below if REDIS_URL is malformed
+    }
+  }
+
+  return {
+    host: process.env.REDIS_HOST || "localhost",
+    port: parseInt(process.env.REDIS_PORT || "6379", 10),
+    ...(process.env.REDIS_PASSWORD ? { password: process.env.REDIS_PASSWORD } : {}),
+    ...(process.env.REDIS_TLS === "true" ? { tls: {} } : {}),
+  };
+}

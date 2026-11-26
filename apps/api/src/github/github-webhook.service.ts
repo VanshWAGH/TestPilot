@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { RunnerService } from "../runs/runner.service";
+import { SmokeGateService } from "./smoke-gate.service";
 import { Octokit } from "@octokit/rest";
 import * as crypto from "crypto";
 
@@ -53,6 +54,8 @@ export class GitHubWebhookService {
     @Optional()
     @Inject(forwardRef(() => RunnerService))
     private readonly runnerService?: RunnerService,
+    @Optional()
+    private readonly smokeGateService?: SmokeGateService,
   ) {}
 
   // ─── Public Webhook Entry Point ───────────────────────────────────────────
@@ -110,6 +113,19 @@ export class GitHubWebhookService {
         event: "issues",
         action,
         message: `Issue #${issue.number} ${action} handled`,
+      };
+    }
+
+    // 4. Task 6.12: Handle deployment webhook → Smoke suite fast-path (< 2 min)
+    if (event === "deployment" && this.smokeGateService) {
+      const smokeResult =
+        await this.smokeGateService.handleDeploymentWebhook(payload);
+      return {
+        received: true,
+        event: "deployment",
+        action: payload?.action,
+        testRunId: smokeResult.testRunId,
+        message: smokeResult.message,
       };
     }
 
