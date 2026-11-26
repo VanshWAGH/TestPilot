@@ -22,6 +22,7 @@ model User {
   // Relations
   ownedWorkspaces Workspace[]
   memberships     WorkspaceMember[]
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -38,6 +39,7 @@ model Workspace {
   // Relations
   projects Project[]
   members  WorkspaceMember[]
+  auditLogs AuditLog[]
 
   @@map("workspaces")
 }
@@ -75,6 +77,10 @@ model Project {
   jiraApiToken     String?           @map("jira_api_token")
   jiraIssueType    String?           @default("Bug") @map("jira_issue_type")
   ciProvider       String            @default("github_actions") @map("ci_provider")
+  llmProvider      String?           @default("google") @map("llm_provider") // google, openai, anthropic, groq, ollama
+  llmApiKeyEncrypted String?         @map("llm_api_key_encrypted")
+  llmModel         String?           @map("llm_model")
+  notificationConfig NotificationConfig?
   environments     Environment[]
   crawlJobs        CrawlJob[]
   pages            Page[]
@@ -84,6 +90,7 @@ model Project {
   defects          Defect[]
   baselines        PageBaseline[]
   schedules        Schedule[]
+  auditLogs        AuditLog[]
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
 
@@ -268,6 +275,9 @@ model TestRun {
   environment          Environment?  @relation(fields: [environmentId], references: [id])
   triggerType          String        @default("manual") @map("trigger_type") // manual, schedule, webhook
   status               String        @default("queued") // queued, in_progress, passed, failed, cancelled
+  approvalStatus       String?       @default("none") @map("approval_status") // none, pending_approval, approved, rejected
+  approvedBy           String?       @map("approved_by")
+  approvedAt           DateTime?     @map("approved_at")
   githubWorkflowRunId  String?       @map("github_workflow_run_id")
   total                Int           @default(0)
   passed               Int           @default(0)
@@ -519,4 +529,47 @@ model Schedule {
   @@index([projectId])
   @@index([enabled])
   @@map("schedules")
+}
+
+// ─── Task 6.3: Notification Configuration ──────────────────────────────────
+
+model NotificationConfig {
+  id              String   @id @default(uuid())
+  projectId       String   @unique @map("project_id")
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slackWebhookUrl String?  @map("slack_webhook_url")
+  emailRecipients String?  @map("email_recipients") // Comma-separated list of emails
+  sendgridApiKey  String?  @map("sendgrid_api_key")
+  resendApiKey    String?  @map("resend_api_key")
+  fromEmail       String?  @default("notifications@testpilot.ai") @map("from_email")
+  eventTriggers   String?  @default("{\"run_completed\":[\"slack\"],\"run_failed\":[\"slack\",\"email\",\"github\"],\"defect_created\":[\"slack\",\"github\"],\"defect_verified\":[\"slack\",\"github\"],\"healing_pr_opened\":[\"slack\"]}") @map("event_triggers")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_configs")
+}
+
+// ─── Task 6.6: Audit Logging ───────────────────────────────────────────────
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  workspaceId  String    @map("workspace_id")
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId    String?   @map("project_id")
+  project      Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId       String?   @map("user_id")
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action       String    // project:create, crawl:trigger, scenario:approve, healing:merge, defect:create, verification:run, run:approve_prod, secret:update
+  resourceType String    @map("resource_type") // project, crawl, scenario, healing, defect, verification, run, schedule, secret
+  resourceId   String?   @map("resource_id")
+  description  String
+  metadata     String?   @db.Text
+  ipAddress    String?   @map("ip_address")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

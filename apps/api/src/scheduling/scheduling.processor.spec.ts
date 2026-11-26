@@ -123,4 +123,44 @@ describe("SchedulingProcessor", () => {
     expect(result.reason).toBe("unknown_job_type");
     expect(mockSchedulingService.markLastRun).toHaveBeenCalledWith("sched-99");
   });
+
+  it("should enqueue failed job onto DLQ when retries are exhausted", async () => {
+    const mockDlqQueue: any = {
+      add: vi.fn().mockResolvedValue({ id: "dlq-1" }),
+    };
+    const failingSchedulingService: any = {
+      markLastRun: vi.fn().mockRejectedValue(new Error("DB write failed")),
+    };
+    const dlqAwareProcessor = new SchedulingProcessor(
+      failingSchedulingService,
+      mockDlqQueue,
+    );
+
+    const mockJob: any = {
+      id: "job-999",
+      name: "nightly_regression:sched-err",
+      attemptsMade: 2,
+      opts: { attempts: 3 },
+      data: {
+        scheduleId: "sched-err",
+        projectId: "proj-1",
+        jobType: "nightly_regression",
+      },
+    };
+
+    await expect(dlqAwareProcessor.process(mockJob)).rejects.toThrow(
+      "DB write failed",
+    );
+    expect(mockDlqQueue.add).toHaveBeenCalledWith(
+      "dead-letter",
+      expect.objectContaining({
+        originalQueue: "schedule",
+        originalJobId: "job-999",
+        projectId: "proj-1",
+        scheduleId: "sched-err",
+        errorMessage: "DB write failed",
+        attemptsMade: 3,
+      }),
+    );
+  });
 });

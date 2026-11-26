@@ -9,6 +9,7 @@ import {
   Sparkles, 
   Bug, 
   CalendarClock,
+  ShieldCheck,
   Settings, 
   Activity,
   Layers
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Self-Healing", href: "/healing", icon: Sparkles },
   { name: "Defects", href: "/defects", icon: Bug },
   { name: "Schedules", href: "/schedules", icon: CalendarClock },
+  { name: "Audit Trail", href: "/audit", icon: ShieldCheck },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

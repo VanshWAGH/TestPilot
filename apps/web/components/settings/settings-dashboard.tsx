@@ -4,17 +4,33 @@ import { useState } from "react";
 import {
   FolderGit2,
   Sliders,
-  ShieldCheck,
-  Sparkles,
   Server,
   Settings,
-  Layers,
+  Bell,
+  Cpu,
+  Users,
+  ShieldCheck,
+  FileText,
+  Activity,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GitHubSettingsCard } from "./github-settings-card";
-import { RepoStatusCard } from "../scenarios/repo-status-card";
+import { NotificationSettingsCard } from "./notification-settings-card";
+import { LlmSettingsCard } from "./llm-settings-card";
+import { EnvironmentsSettingsCard } from "./environments-settings-card";
+import { TeamSettingsCard } from "./team-settings-card";
+import { SecurityChecklistCard } from "../security/security-checklist-card";
+import { AuditLogViewer } from "../audit/audit-log-viewer";
+import { ObservabilityResilienceCard } from "./observability-resilience-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SettingsDashboardProps {
   initialProjects: Array<{ id: string; name: string; baseUrl: string }>;
@@ -22,100 +38,165 @@ interface SettingsDashboardProps {
 
 export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
   const [activeTab, setActiveTab] = useState<string>("github");
-  const [selectedRepoProjectId, setSelectedRepoProjectId] = useState<string>(
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(
     initialProjects[0]?.id || "",
   );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* ─── Header ──────────────────────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Settings & Integrations
-          </h1>
-          <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">
-            <Sparkles className="w-3 h-3 mr-1" />
-            Phase 2
-          </Badge>
+      {/* ─── Header & Project Selector ────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Settings className="w-6 h-6 text-primary" />
+              Settings &amp; Integrations
+            </h1>
+            <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary text-xs">
+              Phase 6 Ready
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Configure GitHub App, LLM provider API keys, environments, notification preferences, and team access.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage GitHub App installation, repository scoping, permission grants, and automation preferences.
-        </p>
+
+        {initialProjects.length > 0 && (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs text-muted-foreground font-medium shrink-0">Active Project:</span>
+            <Select value={selectedProjectId} onValueChange={(val) => setSelectedProjectId(val || "")}>
+              <SelectTrigger className="w-full sm:w-[220px] text-xs">
+                <SelectValue placeholder="Select Project" />
+              </SelectTrigger>
+              <SelectContent>
+                {initialProjects.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* ─── Tabs Navigation ─────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-card border border-border p-1 h-10">
+        <TabsList className="bg-card border border-border p-1 h-10 w-full sm:w-auto overflow-x-auto justify-start">
           <TabsTrigger
             value="github"
-            className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
           >
             <FolderGit2 className="w-3.5 h-3.5" />
-            GitHub App &amp; Repositories
+            GitHub App
           </TabsTrigger>
+
           <TabsTrigger
-            value="repo"
-            className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+            value="llm"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
           >
-            <Layers className="w-3.5 h-3.5" />
-            Test-Suite Repository
+            <Cpu className="w-3.5 h-3.5" />
+            API Keys &amp; LLM
           </TabsTrigger>
-          <TabsTrigger
-            value="preferences"
-            className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            Healing &amp; Automation
-          </TabsTrigger>
+
           <TabsTrigger
             value="environments"
-            className="text-xs px-4 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
           >
             <Server className="w-3.5 h-3.5" />
-            Environments
+            Environments &amp; Secrets
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="notifications"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            Notifications
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="team"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <Users className="w-3.5 h-3.5" />
+            Team Members
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="security"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            Security &amp; Hardening
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="audit"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Audit Trail
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="observability"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <Activity className="w-3.5 h-3.5 text-sky-400" />
+            Observability &amp; Resilience
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="preferences"
+            className="text-xs px-3.5 h-8 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            Automation
           </TabsTrigger>
         </TabsList>
 
-        {/* ─── GitHub App Tab (Task 2.11) ─────────────────────────────────────── */}
+        {/* ─── Tab 1: GitHub App & Repositories ───────────────────────────────── */}
         <TabsContent value="github" className="space-y-6">
           <GitHubSettingsCard projects={initialProjects} />
         </TabsContent>
 
-        {/* ─── Test-Suite Repository Tab (Task 2.13) ─────────────────────────── */}
-        <TabsContent value="repo" className="space-y-6">
-          {initialProjects.length > 1 && (
-            <div className="flex items-center gap-2 bg-secondary/30 border border-border p-2 rounded-lg max-w-sm">
-              <span className="text-xs text-muted-foreground font-medium pl-1">Project:</span>
-              <select
-                value={selectedRepoProjectId}
-                onChange={(e) => setSelectedRepoProjectId(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-foreground focus:outline-none cursor-pointer flex-1"
-              >
-                {initialProjects.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-card text-foreground">
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {selectedRepoProjectId ? (
-            <RepoStatusCard
-              projectId={selectedRepoProjectId}
-              projectName={
-                initialProjects.find((p) => p.id === selectedRepoProjectId)?.name || "Project"
-              }
-            />
-          ) : (
-            <div className="p-8 text-center text-xs text-muted-foreground">
-              No projects created yet.
-            </div>
-          )}
+        {/* ─── Tab 2: LLM & API Keys (Task 6.4) ───────────────────────────────── */}
+        <TabsContent value="llm" className="space-y-6">
+          <LlmSettingsCard projectId={selectedProjectId} />
         </TabsContent>
 
-        {/* ─── Healing & Automation Tab ───────────────────────────────────────── */}
+        {/* ─── Tab 3: Environments & Secrets (Task 6.4) ───────────────────────── */}
+        <TabsContent value="environments" className="space-y-6">
+          <EnvironmentsSettingsCard projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 4: Notifications (Task 6.3 & 6.4) ─────────────────────────── */}
+        <TabsContent value="notifications" className="space-y-6">
+          <NotificationSettingsCard projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 5: Team Members (Task 6.4) ─────────────────────────────────── */}
+        <TabsContent value="team" className="space-y-6">
+          <TeamSettingsCard projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 6: Security Hardening (Task 6.5) ───────────────────────────── */}
+        <TabsContent value="security" className="space-y-6">
+          <SecurityChecklistCard projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 7: Audit Trail (Task 6.6) ──────────────────────────────────── */}
+        <TabsContent value="audit" className="space-y-6">
+          <AuditLogViewer projectId={selectedProjectId} />
+        </TabsContent>
+
+        {/* ─── Tab 8: Observability & Resilience (Tasks 6.7 & 6.8) ────────────── */}
+        <TabsContent value="observability" className="space-y-6">
+          <ObservabilityResilienceCard />
+        </TabsContent>
+
+        {/* ─── Tab 9: Automation Preferences ─────────────────────────────────── */}
         <TabsContent value="preferences" className="space-y-6">
           <Card className="bg-card/60 backdrop-blur-md border-border">
             <CardHeader>
@@ -155,38 +236,6 @@ export function SettingsDashboard({ initialProjects }: SettingsDashboardProps) {
                     High-confidence heals automatically open a pull request on GitHub with DOM evidence.
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ─── Environments Tab ──────────────────────────────────────────────── */}
-        <TabsContent value="environments" className="space-y-6">
-          <Card className="bg-card/60 backdrop-blur-md border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Project Environments</CardTitle>
-              <CardDescription className="text-xs">
-                Target environments, base URLs, and encrypted credentials configured for testing.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {initialProjects.map((proj) => (
-                  <div
-                    key={proj.id}
-                    className="p-3 rounded-lg border border-border bg-secondary/20 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <span className="font-semibold text-foreground">{proj.name}</span>
-                      <p className="font-mono text-muted-foreground text-[11px] mt-0.5">
-                        Base URL: {proj.baseUrl}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                      Default Target
-                    </Badge>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>

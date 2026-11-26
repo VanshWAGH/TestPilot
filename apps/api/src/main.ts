@@ -1,15 +1,4 @@
-import * as dotenv from "dotenv";
-import * as path from "path";
-
-// Load environment variables robustly across all execution modes
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
-dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../.env.local"), override: true });
-dotenv.config({ path: path.resolve(__dirname, "../../.env.local"), override: true });
-dotenv.config({ path: path.resolve(__dirname, "../../../.env.local"), override: true });
+import "./tracing";
 
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
@@ -32,7 +21,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-    })
+    }),
   );
 
   app.enableCors({
@@ -61,9 +50,22 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   await app.listen(port);
 
-  logger.log(`🚀 API Server running on: http://localhost:${port}/api/v1`, "Bootstrap");
-  logger.log(`📖 Swagger API Docs available at: http://localhost:${port}/api/docs`, "Bootstrap");
-  logger.log(`📊 BullMQ Queue Board available at: http://localhost:${port}/admin/queues`, "Bootstrap");
+  logger.log(
+    `🚀 API Server running on: http://localhost:${port}/api/v1`,
+    "Bootstrap",
+  );
+  logger.log(
+    `📖 Swagger API Docs available at: http://localhost:${port}/api/docs`,
+    "Bootstrap",
+  );
+  logger.log(
+    `📊 BullMQ Queue Board available at: http://localhost:${port}/admin/queues`,
+    "Bootstrap",
+  );
+  logger.log(
+    `📈 Prometheus Metrics available at: http://localhost:${port}/api/v1/metrics`,
+    "Bootstrap",
+  );
   logger.log(`🔌 WebSocket gateway live at: ws://localhost:${port}`, "Bootstrap");
 }
 

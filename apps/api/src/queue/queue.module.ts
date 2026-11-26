@@ -3,7 +3,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { BullBoardModule } from "@bull-board/nestjs";
 import { ExpressAdapter } from "@bull-board/express";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
-import { QUEUES } from "./queue.constants";
+import { QUEUES, DEFAULT_RETRY_JOB_OPTIONS } from "./queue.constants";
 
 @Module({
   imports: [
@@ -13,15 +13,24 @@ import { QUEUES } from "./queue.constants";
           host: process.env.REDIS_HOST || "localhost",
           port: parseInt(process.env.REDIS_PORT || "6379", 10),
         },
+        defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS,
       }),
     }),
     BullModule.registerQueue(
-      { name: QUEUES.CRAWL },
-      { name: QUEUES.TEST_GEN },
-      { name: QUEUES.RUN },
-      { name: QUEUES.HEAL },
-      { name: QUEUES.VERIFY },
-      { name: QUEUES.SCHEDULE },
+      { name: QUEUES.CRAWL, defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS },
+      { name: QUEUES.TEST_GEN, defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS },
+      { name: QUEUES.RUN, defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS },
+      { name: QUEUES.HEAL, defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS },
+      { name: QUEUES.VERIFY, defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS },
+      { name: QUEUES.SCHEDULE, defaultJobOptions: DEFAULT_RETRY_JOB_OPTIONS },
+      {
+        name: QUEUES.DLQ,
+        defaultJobOptions: {
+          attempts: 1,
+          removeOnComplete: 200,
+          removeOnFail: false,
+        },
+      },
     ),
     BullBoardModule.forRoot({
       route: "/admin/queues",
@@ -34,6 +43,7 @@ import { QUEUES } from "./queue.constants";
       { name: QUEUES.HEAL, adapter: BullMQAdapter },
       { name: QUEUES.VERIFY, adapter: BullMQAdapter },
       { name: QUEUES.SCHEDULE, adapter: BullMQAdapter },
+      { name: QUEUES.DLQ, adapter: BullMQAdapter },
     ),
   ],
   exports: [BullModule],

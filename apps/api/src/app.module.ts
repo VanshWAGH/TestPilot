@@ -6,6 +6,8 @@ import { HealthModule } from "./health/health.module";
 import { AuthModule } from "./auth/auth.module";
 import { StorageModule } from "./storage/storage.module";
 import { CryptoModule } from "./common/crypto/crypto.module";
+import { TelemetryModule } from "./telemetry/telemetry.module";
+import { ResilienceModule } from "./common/resilience/resilience.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { CrawlerModule } from "./crawler/crawler.module";
 import { LlmModule } from "./llm/llm.module";
@@ -16,6 +18,8 @@ import { BaselinesModule } from "./baselines/baselines.module";
 import { HealingModule } from "./healing/healing.module";
 import { DefectsModule } from "./defects/defects.module";
 import { SchedulingModule } from "./scheduling/scheduling.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { AuditModule } from "./audit/audit.module";
 
 @Module({
   imports: [
@@ -45,6 +49,7 @@ import { SchedulingModule } from "./scheduling/scheduling.module";
 
     PrismaModule,
     CryptoModule,
+    TelemetryModule,
     QueueModule,
     HealthModule,
     AuthModule,
@@ -59,6 +64,9 @@ import { SchedulingModule } from "./scheduling/scheduling.module";
     HealingModule,
     DefectsModule,
     SchedulingModule,
+    NotificationsModule,
+    AuditModule,
+    ResilienceModule,
   ],
 })
 export class AppModule {}
