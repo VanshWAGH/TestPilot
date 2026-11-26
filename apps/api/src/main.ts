@@ -24,9 +24,14 @@ async function bootstrap() {
     }),
   );
 
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+    : "*";
+
   app.enableCors({
-    origin: "*",
+    origin: corsOrigin,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+    credentials: corsOrigin !== "*",
   });
 
   // Use Socket.IO WebSocket adapter
@@ -39,9 +44,14 @@ async function bootstrap() {
   // --- Swagger API Documentation ---
   const config = new DocumentBuilder()
     .setTitle("TestPilot Platform API")
-    .setDescription("Self-Healing Playwright Test Automation Platform API")
-    .setVersion("1.0")
+    .setDescription(
+      "AI-Native Self-Healing Playwright Test Automation Platform API. Supports autonomous crawling, Page Object & test generation, deterministic + LLM self-healing, GitHub Defect Lifecycle, scheduled runs, audit logging, and Prometheus observability.",
+    )
+    .setVersion("1.0.0")
     .addBearerAuth()
+    .addTag("Health", "Service liveness and readiness checks")
+    .addTag("Observability", "Prometheus metrics endpoint")
+    .addTag("Resilience & Observability", "Circuit breakers, DLQ, and OTel status")
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

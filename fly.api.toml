@@ -1,0 +1,31 @@
+# Fly.io Configuration for TestPilot API
+# Deploy: flyctl deploy --config fly.api.toml
+app = "testpilot-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+  OTEL_ENABLED = "false"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/api/v1/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
