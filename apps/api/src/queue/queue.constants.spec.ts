@@ -40,6 +40,16 @@ describe("getRedisConnectionOptions", () => {
       host: "redis.internal",
       port: 6381,
       tls: {},
+      connectTimeout: 5000,
     });
+  });
+
+  it("strips surrounding quotes from REDIS_URL", () => {
+    process.env.REDIS_URL = '"rediss://default:pass@upstash.io:6379"';
+
+    const opts = getRedisConnectionOptions();
+    expect(opts.host).toBe("upstash.io");
+    expect(opts.port).toBe(6379);
+    expect(opts.tls).toEqual({});
   });
 });

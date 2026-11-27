@@ -8,10 +8,7 @@ import { Logger } from "nestjs-pino";
 import { IoAdapter } from "@nestjs/platform-socket.io";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    // Disable NestJS default logger; Pino will handle everything
-    bufferLogs: true,
-  });
+  const app = await NestFactory.create(AppModule);
 
   // Use Pino logger globally (structured JSON in production, pretty in dev)
   const logger = app.get(Logger);

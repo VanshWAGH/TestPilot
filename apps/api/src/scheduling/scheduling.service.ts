@@ -25,8 +25,19 @@ export class SchedulingService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Sync all enabled schedules as BullMQ repeatable jobs on startup
-    await this.syncRepeatableJobs();
+    // Sync all enabled schedules as BullMQ repeatable jobs on startup (non-blocking if Redis is slow)
+    try {
+      await Promise.race([
+        this.syncRepeatableJobs(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Schedule sync timed out after 5s")), 5000),
+        ),
+      ]);
+    } catch (err: any) {
+      this.logger.warn(
+        `Skipping startup repeatable job sync: ${err?.message || String(err)}`,
+      );
+    }
   }
 
   // ─── List ───────────────────────────────────────────────────────────────
